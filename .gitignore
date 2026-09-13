@@ -1,0 +1,8 @@
+**/node_modules/
+**/.nuxt/
+**/.nuxt-multi-app/
+**/.nuxtrc
+**/.output/
+
+/dist/
+/test-results/
