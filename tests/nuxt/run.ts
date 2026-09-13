@@ -391,7 +391,7 @@ async function assertStaticProductionRouting(cwd: string) {
     child.kill("SIGTERM")
     assert.equal(await child.exited, 0)
   }
-  assert.match(await stdout, /\[nuxt-multi-app] routing: hosts/)
+  assert.match(await stdout, /\[nuxt-multi-app] routing: hosts; fallback: 404/)
 }
 
 function diagnosticsFor(file: string, configPath: string) {

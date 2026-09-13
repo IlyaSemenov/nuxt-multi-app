@@ -290,15 +290,10 @@ server.listen(port, host, () => {
       : `http://${address.address}:${address.port}`
   console.log(`[nuxt-multi-app] listening on ${origin}; PID=${process.pid}`)
   const hasHosts = apps.some((app) => app.hosts.length)
-  console.log(
-    `[nuxt-multi-app] routing: ${resolver ? (hasHosts ? "resolver-and-hosts" : "resolver") : "hosts"}`,
-  )
+  const routing = resolver ? (hasHosts ? "resolver-and-hosts" : "resolver") : "hosts"
+  const fallback = manifest.fallback === false ? "404" : manifest.fallback
+  console.log(`[nuxt-multi-app] routing: ${routing}; fallback: ${fallback}`)
   for (const app of apps) {
     if (app.hosts.length) console.log(`[nuxt-multi-app] ${app.hosts.join(", ")} -> ${app.id}`)
   }
-  console.log(
-    manifest.fallback === false
-      ? "[nuxt-multi-app] no resolver or host match -> 404"
-      : `[nuxt-multi-app] no resolver or host match -> ${manifest.fallback}`,
-  )
 })
