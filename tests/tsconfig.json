@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig",
+  "compilerOptions": {
+    "paths": {
+      "nuxt-multi-app": ["../src/module.ts"],
+      "nuxt-multi-app/runtime": ["../src/runtime/types.ts"]
+    }
+  },
+  "include": ["nuxt/**/*.ts", "types/**/*.ts"]
+}
