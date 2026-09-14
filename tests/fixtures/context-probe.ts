@@ -1,7 +1,17 @@
-import { appendFile } from "node:fs/promises"
+import { access, appendFile, writeFile } from "node:fs/promises"
 import { setTimeout } from "node:timers/promises"
 
 import { defineNuxtModule, nuxtCtx, useNuxt } from "nuxt/kit"
+
+async function fileExists(path: string) {
+  try {
+    await access(path)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
+    throw error
+  }
+}
 
 /** Observe overlapping Nuxt contexts and verify that each generation releases its Vite resources. */
 export default defineNuxtModule({
@@ -59,8 +69,13 @@ export default defineNuxtModule({
       }
     })
 
-    if (process.env.NUXT_MULTI_APP_TEST_SLOW_CHILD && nuxt.options.rootDir.endsWith("/web")) {
-      nuxt.hook("app:templatesGenerated", () => setTimeout(1_000))
+    const startupBarrier = process.env.NUXT_MULTI_APP_TEST_CHILD_STARTUP_BARRIER
+    if (startupBarrier && nuxt.options.rootDir.endsWith("/web")) {
+      nuxt.hook("app:templatesGenerated", async () => {
+        // Hold the first child build until the integration test has observed its starting state.
+        await writeFile(`${startupBarrier}.waiting`, "")
+        while (!(await fileExists(`${startupBarrier}.release`))) await setTimeout(50)
+      })
     }
   },
 })

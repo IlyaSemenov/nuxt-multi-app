@@ -171,9 +171,16 @@ async function checkServer(
   const port = await unusedPort()
   const origin = `http://127.0.0.1:${port}`
   const resolverOutput = join(workspace, `resolver-${mode}.log`)
+  const childStartupBarrier = join(workspace, `child-startup-${mode}`)
+  const childStartupWaiting = `${childStartupBarrier}.waiting`
+  const childStartupRelease = `${childStartupBarrier}.release`
   const runtimeBase =
     mode === "production" ? "runtime-a.localhost" : mode === "portable" ? "runtime-b.localhost" : ""
-  await rm(resolverOutput, { force: true })
+  await Promise.all(
+    [resolverOutput, childStartupWaiting, childStartupRelease].map((path) =>
+      rm(path, { force: true }),
+    ),
+  )
   const env = {
     ...process.env,
     HOST: "127.0.0.1",
@@ -183,7 +190,7 @@ async function checkServer(
     NUXT_MULTI_APP_TEST_OUTPUT: join(workspace, "contexts.jsonl"),
     NUXT_MULTI_APP_TEST_RESOLVER_OUTPUT: resolverOutput,
     NUXT_MULTI_APP_TEST_BASE: runtimeBase,
-    NUXT_MULTI_APP_TEST_SLOW_CHILD: mode === "development" ? "1" : "",
+    NUXT_MULTI_APP_TEST_CHILD_STARTUP_BARRIER: mode === "development" ? childStartupBarrier : "",
   }
   const child = Bun.spawn(command, {
     cwd,
@@ -198,11 +205,17 @@ async function checkServer(
     if (mode === "development") {
       await waitUntil(
         child,
+        () => Bun.file(childStartupWaiting).exists(),
+        "Mounted child did not reach its startup barrier",
+      )
+      await waitUntil(
+        child,
         async () => (await request(origin, "/", hosts.root)).status === 200,
         "Listener owner did not become ready",
       )
       const starting = await request(origin, "/api/dispatch", hosts.root)
       assert.equal(starting.status, 503, "Dispatch did not expose a starting backend as 503")
+      await writeFile(childStartupRelease, "")
     }
     await waitUntilReady(origin, child)
     assert.deepEqual((await readFile(resolverOutput, "utf8")).trim().split("\n"), [
@@ -249,6 +262,7 @@ async function checkServer(
       await assertIpcStopped(snapshots)
     }
   } finally {
+    if (mode === "development") await writeFile(childStartupRelease, "").catch(() => undefined)
     if (!stopped && child.exitCode === null) {
       if (process.platform === "win32") child.kill("SIGKILL")
       else process.kill(-child.pid, "SIGKILL")
