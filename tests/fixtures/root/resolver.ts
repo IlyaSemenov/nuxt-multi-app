@@ -7,7 +7,7 @@ if (output) appendFileSync(output, "import\n")
 
 export default defineMultiAppResolver(({ appIds }) => {
   if (output) appendFileSync(output, "initialize\n")
-  if (process.env.NUXT_MULTI_APP_TEST_RESOLVER_FAIL) {
+  if (import.meta.env.NUXT_MULTI_APP_TEST_RESOLVER_FAIL) {
     throw new Error("intentional resolver initialization failure")
   }
   for (const id of ["root", "web"] as const) {

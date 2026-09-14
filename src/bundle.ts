@@ -2,11 +2,20 @@ import { mkdir } from "node:fs/promises"
 import { dirname, isAbsolute } from "node:path"
 
 import { build } from "esbuild"
-import type { Plugin } from "esbuild"
+import type { BuildOptions, Plugin } from "esbuild"
 import type { Nuxt } from "nuxt/schema"
 
+interface BundleForOutputOptions {
+  define?: BuildOptions["define"]
+  plugins?: Plugin[]
+}
+
 /** Bundle one ESM entry with every dependency inlined, so the output runs without node_modules. */
-export async function bundleForOutput(input: string, output: string, plugins: Plugin[] = []) {
+export async function bundleForOutput(
+  input: string,
+  output: string,
+  options: BundleForOutputOptions = {},
+) {
   await mkdir(dirname(output), { recursive: true })
   await build({
     entryPoints: [input],
@@ -17,13 +26,17 @@ export async function bundleForOutput(input: string, output: string, plugins: Pl
     target: "node22",
     sourcemap: true,
     packages: "bundle",
-    plugins,
+    ...options,
   })
 }
 
 /** Bundle project-owned routing code so the generated Nitro output remains portable. */
 export function bundleProjectModule(input: string, output: string, nuxt: Nuxt) {
-  return bundleForOutput(input, output, [projectHelpers(), nuxtAliases(nuxt.options.alias)])
+  return bundleForOutput(input, output, {
+    // Project modules execute beside Nitro handlers, so expose the same live environment contract.
+    define: { "import.meta.env": "process.env" },
+    plugins: [projectHelpers(), nuxtAliases(nuxt.options.alias)],
+  })
 }
 
 function projectHelpers(): Plugin {
