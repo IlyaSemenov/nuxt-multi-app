@@ -15,7 +15,7 @@ import { defaultStateHandler } from "./state"
 
 /** Routing configuration that `nuxt build` writes in the module-owned output directory. */
 interface Manifest {
-  apps: { id: string; hosts: string[]; entry: string }[]
+  apps: { id: string; paths: string[]; hosts: string[]; entry: string }[]
   fallback: string | false
   resolver: string | null
   stateHandler: string | null
@@ -26,6 +26,7 @@ interface Manifest {
 
 interface App {
   id: string
+  paths: string[]
   hosts: string[]
   handler: RequestListener
   nitro: NitroRuntime
@@ -124,6 +125,7 @@ for (const definition of manifest.apps) {
   }
   const app: App = {
     id: definition.id,
+    paths: definition.paths,
     hosts: definition.hosts,
     handler: handler as RequestListener,
     ...registration,
@@ -289,11 +291,15 @@ server.listen(port, host, () => {
       ? String(address)
       : `http://${address.address}:${address.port}`
   console.log(`[nuxt-multi-app] listening on ${origin}; PID=${process.pid}`)
+  const hasPaths = apps.some((app) => app.paths.length)
   const hasHosts = apps.some((app) => app.hosts.length)
-  const routing = resolver ? (hasHosts ? "resolver-and-hosts" : "resolver") : "hosts"
+  const routing = [hasPaths && "paths", resolver && "resolver", hasHosts && "hosts"]
+    .filter(Boolean)
+    .join("-and-")
   const fallback = manifest.fallback === false ? "404" : manifest.fallback
-  console.log(`[nuxt-multi-app] routing: ${routing}; fallback: ${fallback}`)
+  console.log(`[nuxt-multi-app] routing: ${routing || "fallback"}; fallback: ${fallback}`)
   for (const app of apps) {
+    if (app.paths.length) console.log(`[nuxt-multi-app] path ${app.paths.join(", ")} -> ${app.id}`)
     if (app.hosts.length) console.log(`[nuxt-multi-app] ${app.hosts.join(", ")} -> ${app.id}`)
   }
 })

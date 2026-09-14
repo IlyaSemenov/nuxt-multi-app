@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http"
 
 import type { MultiAppResolver } from "../options"
+import { requestPath } from "./request"
 
 /** Normalize a Host header for both custom resolution and declarative host matching. */
 export function normalizeHost(header: string | undefined) {
@@ -19,13 +20,36 @@ function selectHost<App extends { hosts: string[] }>(apps: App[], host: string) 
   )
 }
 
-/** Select an application once, before the request body is consumed: resolver, hosts, then fallback. */
-export async function selectApplication<App extends { id: string; hosts: string[] }>(
+/** Select the application with the longest matching path prefix. */
+function selectPath<App extends { paths: string[] }>(apps: App[], path: string) {
+  let match: App | undefined
+  let matchLength = -1
+  for (const app of apps) {
+    for (const prefix of app.paths) {
+      // A prefix owns its exact path and descendants, while `/` owns every absolute path.
+      if (
+        prefix.length > matchLength &&
+        (prefix === "/" || path === prefix || path.startsWith(`${prefix}/`))
+      ) {
+        match = app
+        matchLength = prefix.length
+      }
+    }
+  }
+  return match
+}
+
+/** Select an application once: path prefixes, resolver, hosts, then fallback. */
+export async function selectApplication<
+  App extends { id: string; paths: string[]; hosts: string[] },
+>(
   apps: App[],
   fallback: string | false,
   resolver: MultiAppResolver | undefined,
   request: IncomingMessage,
 ): Promise<App | undefined> {
+  const pathMatch = selectPath(apps, requestPath(request))
+  if (pathMatch) return pathMatch
   const host = normalizeHost(request.headers.host)
   if (resolver) {
     const id = await resolver(host, request)

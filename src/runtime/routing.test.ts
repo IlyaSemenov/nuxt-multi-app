@@ -1,18 +1,40 @@
 import { describe, expect, it } from "bun:test"
 
-import type { NormalizedAppOptions } from "../options"
 import { selectApplication } from "./routing"
 
 const apps = [
-  { id: "root", hosts: ["example.test"] },
-  { id: "web", hosts: ["*.tenant.test"] },
-] as NormalizedAppOptions[]
+  { id: "root", paths: [], hosts: ["example.test"] },
+  { id: "web", paths: [], hosts: ["*.tenant.test"] },
+]
 
 function request(host: string, path = "/") {
   return { headers: { host }, url: path } as import("node:http").IncomingMessage
 }
 
 describe("application routing", () => {
+  it("uses the longest segment-boundary path prefix before the resolver", async () => {
+    const pathApps = [
+      { id: "root", paths: ["/api"], hosts: ["example.test"] },
+      { id: "web", paths: ["/api/admin"], hosts: ["*.tenant.test"] },
+    ]
+    expect(
+      (await selectApplication(pathApps, false, () => false, request("unknown.test", "/api")))?.id,
+    ).toBe("root")
+    expect(
+      (
+        await selectApplication(
+          pathApps,
+          false,
+          undefined,
+          request("unknown.test", "/api/admin/users?active=1"),
+        )
+      )?.id,
+    ).toBe("web")
+    expect(
+      await selectApplication(pathApps, false, undefined, request("unknown.test", "/apix")),
+    ).toBeUndefined()
+  })
+
   it("routes by static hosts without a resolver", async () => {
     expect((await selectApplication(apps, false, undefined, request("example.test")))?.id).toBe(
       "root",

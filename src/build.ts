@@ -28,10 +28,18 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
       // Relocate only after Nitro finishes so its configured output root and top-level build
       // metadata remain the canonical output discovered by `nuxt preview`.
       const rootEntry = await relocateRootOutput(output, options.root.id)
-      const entries = [{ id: options.root.id, hosts: options.root.hosts, entry: rootEntry }]
+      const entries = [
+        {
+          id: options.root.id,
+          paths: options.root.paths,
+          hosts: options.root.hosts,
+          entry: rootEntry,
+        },
+      ]
       for (const app of options.apps) {
         entries.push({
           id: app.id,
+          paths: app.paths,
           hosts: app.hosts,
           entry: await buildChild(
             app,
@@ -110,7 +118,7 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
 
 async function writeProductionServer(
   outputDir: string,
-  entries: { id: string; hosts: string[]; entry: string }[],
+  entries: { id: string; paths: string[]; hosts: string[]; entry: string }[],
   options: NormalizedModuleOptions,
   nuxt: Nuxt,
 ) {

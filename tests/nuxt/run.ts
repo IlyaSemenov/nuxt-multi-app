@@ -405,6 +405,9 @@ async function assertStaticProductionRouting(cwd: string) {
     await waitUntilReady(origin, child)
     await assertResponse(origin, "/", hosts.root, 200, "ROOT_HMR_0")
     await assertResponse(origin, "/", hosts.web, 200, "WEB_HMR_0")
+    const pathResponse = await request(origin, "/api/owner", hosts.root)
+    assert.equal(pathResponse.status, 200)
+    assert.equal((await pathResponse.json()).app, "web")
     const unmatched = await assertResponse(
       origin,
       "/",
@@ -417,7 +420,7 @@ async function assertStaticProductionRouting(cwd: string) {
     child.kill("SIGTERM")
     assert.equal(await child.exited, 0)
   }
-  assert.match(await stdout, /\[nuxt-multi-app] routing: hosts; fallback: 404/)
+  assert.match(await stdout, /\[nuxt-multi-app] routing: paths-and-hosts; fallback: 404/)
 }
 
 async function assertNuxtPreview(cwd: string) {

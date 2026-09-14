@@ -21,7 +21,7 @@ Do not catalog files or restate information evident from their names and locatio
 
 ## Architecture
 
-- Route a request once, before consuming its body, in the order resolver, host patterns, fallback, unmatched.
+- Route a request once, before consuming its body, in the order path prefixes, resolver, host patterns, fallback, unmatched.
 - Treat application IDs as allowlisted registry keys; never derive a dispatch target from request headers or URLs.
 - Keep browser requests on the public listener and expose dispatch only on the per-request server context.
 - Preserve the caller's headers and Host as request data without forwarding any additional headers automatically.

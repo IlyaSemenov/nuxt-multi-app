@@ -17,8 +17,8 @@ declare module "nuxt-multi-app/runtime" {
 }
 
 const options = {
-  root: { id: "root", hosts: ["example.test"] },
-  apps: [{ id: "web", rootDir: "../web", hosts: ["*.tenant.test"] }],
+  root: { id: "root", paths: ["/internal"], hosts: ["example.test"] },
+  apps: [{ id: "web", rootDir: "../web", paths: ["/api"], hosts: ["*.tenant.test"] }],
   fallback: "web",
   resolver: "./resolver.ts",
   readinessPath: "/ready",

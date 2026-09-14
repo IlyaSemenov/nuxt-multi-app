@@ -14,8 +14,7 @@ export default defineMultiAppResolver(({ appIds }) => {
     if (!appIds.has(id)) throw new Error(`fixture requires application ${id}`)
   }
   const runtimeBase = process.env.NUXT_MULTI_APP_TEST_BASE
-  return (host, request) => {
-    if (request.url?.startsWith("/api/owner")) return "web"
+  return (host) => {
     if (runtimeBase && host === runtimeBase) return "root"
   }
 })

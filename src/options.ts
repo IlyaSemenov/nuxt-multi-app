@@ -10,6 +10,8 @@ export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
 export interface RootOptions {
   /** Stable registry ID used by routing and server-side dispatch; defaults to `root`. */
   id?: string
+  /** Absolute path prefixes served by this application on every host. */
+  paths?: string[]
   /** Exact hosts or leading-wildcard host patterns served by this application. */
   hosts?: string[]
 }
@@ -20,6 +22,8 @@ export interface AppOptions {
   id: string
   /** Application root, resolved from the root application's directory. */
   rootDir: string
+  /** Absolute path prefixes served by this application on every host. */
+  paths?: string[]
   /** Exact hosts or leading-wildcard host patterns served by this application. */
   hosts?: string[]
   /** Explicit mount-point configuration applied after the child's own configuration. */
@@ -114,6 +118,7 @@ export interface ModuleOptions {
 export interface NormalizedAppOptions {
   id: string
   rootDir: string
+  paths: string[]
   hosts: string[]
   overrides: AppOverrides
   buildDir: string

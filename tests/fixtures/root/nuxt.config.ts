@@ -18,6 +18,7 @@ export default defineNuxtConfig({
           {
             id: "web",
             rootDir: "../web",
+            paths: ["/api/owner/"],
             hosts: ["*.tenant.localhost"],
             overrides: {
               plugins: [fileURLToPath(new URL("./root-plugin.ts", import.meta.url))],

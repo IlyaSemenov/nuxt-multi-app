@@ -22,6 +22,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
   const root: NormalizedAppOptions = {
     id: rootId,
     rootDir,
+    paths: normalizePaths(options.root?.paths ?? []),
     hosts: normalizeHosts(options.root?.hosts ?? []),
     overrides: {},
     buildDir: nuxt.options.buildDir,
@@ -52,6 +53,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
     buildDirs.add(normalized.buildDir)
     return normalized
   })
+  assertUniquePaths([root, ...apps])
 
   const fallback = options.fallback ?? MODULE_DEFAULTS.fallback
   if (fallback !== false && !ids.has(fallback)) {
@@ -98,6 +100,7 @@ function normalizeApp(
   return {
     id: app.id,
     rootDir: appRootDir,
+    paths: normalizePaths(app.paths ?? []),
     hosts: normalizeHosts(app.hosts ?? []),
     overrides: app.overrides ?? {},
     buildDir: app.buildDir
@@ -121,6 +124,37 @@ function normalizeHosts(hosts: string[]) {
     }
     return host
   })
+}
+
+function normalizePaths(paths: string[]) {
+  return paths.map((input) => {
+    if (
+      !input.startsWith("/") ||
+      input.startsWith("//") ||
+      input.includes("?") ||
+      input.includes("#") ||
+      input.includes("\\") ||
+      input.split("/").some((segment) => segment === "." || segment === "..")
+    ) {
+      throw new Error(`nuxt-multi-app: invalid path prefix ${input}`)
+    }
+    return input.replace(/\/+$/, "") || "/"
+  })
+}
+
+function assertUniquePaths(apps: NormalizedAppOptions[]) {
+  const owners = new Map<string, string>()
+  for (const app of apps) {
+    for (const path of app.paths) {
+      const owner = owners.get(path)
+      if (owner) {
+        throw new Error(
+          `nuxt-multi-app: path prefix ${path} is assigned to both ${owner} and ${app.id}`,
+        )
+      }
+      owners.set(path, app.id)
+    }
+  }
 }
 
 function resolveModulePath(path: string | undefined, rootDir: string) {

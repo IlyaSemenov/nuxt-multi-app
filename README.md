@@ -52,9 +52,10 @@ export default defineNuxtConfig({
 
 Each application declares:
 
-- `id`: a name, unique across the configuration;
-- `hosts`: hostnames the application answers on;
-- `rootDir`: for a child application, its directory relative to the root application.
+- `id`: the application's unique name;
+- `hosts`, optional: hostnames the application answers on;
+- `paths`, optional: URL path prefixes the application owns on every host;
+- `rootDir`, required for a child: its directory relative to the root application.
 
 A child loads its own `nuxt.config` and inherits nothing from the root — no modules, plugins, styles, routes, or dependencies.
 
@@ -63,9 +64,10 @@ A child loads its own `nuxt.config` and inherits nothing from the root — no mo
 `nuxt-multi-app` routes each request to a single application.
 To pick it, the server tries in order:
 
-1. the resolver from `multiApp.resolver`, if the project has one;
-2. the `hosts` patterns of every application;
-3. the `fallback` application.
+1. the `paths` prefixes of every application;
+2. the resolver from `multiApp.resolver`, if the project has one;
+3. the `hosts` patterns of every application;
+4. the `fallback` application.
 
 If that turns up nothing, the request gets a 404.
 
@@ -83,9 +85,27 @@ When several applications match, the root wins, then children in configuration o
 
 In the quick start, `example.com` and `www.example.com` go to `landing`, subdomains go to `tenant`, and any other host falls back to `tenant`.
 
+### Route by path
+
+Use `paths` when an application owns a complete URL namespace on every host:
+
+```ts
+{
+  id: "tenant",
+  rootDir: "../tenant",
+  paths: ["/api", "/_e2e"],
+}
+```
+
+`/api` matches `/api` and every path below `/api/`, but not `/apix`.
+A trailing slash in configuration is ignored, the query string does not participate in matching, and the longest matching prefix wins.
+The same normalized prefix cannot belong to two applications.
+
+Do not route a single HTML path this way: the page's assets and HMR requests live under different paths and would still go elsewhere.
+
 ### Route with a resolver
 
-`nuxt build` bakes the module configuration, `hosts` included, into the output.
+`nuxt build` bakes the module configuration, including `paths` and `hosts`, into the output.
 Use a resolver when one `.output` has to serve different domains — e2e, staging, production — depending on the environment the server starts in:
 
 ```ts
@@ -93,7 +113,7 @@ Use a resolver when one `.output` has to serve different domains — e2e, stagin
 import { defineMultiAppResolver } from "nuxt-multi-app"
 
 export default defineMultiAppResolver(() => {
-  const landingHost = new URL(process.env.APP_BASE_URL!).hostname
+  const landingHost = new URL(import.meta.env.APP_BASE_URL!).hostname
   return (host) => (host === landingHost ? "landing" : "tenant")
 })
 ```
@@ -113,19 +133,7 @@ Per request, return:
 - `undefined` to fall through to `hosts` and `fallback`;
 - `false` to answer as if nothing matched.
 
-**Caveat.** Startup happens before any application boots, so the file can use `process.env` and ordinary project modules, but no Nuxt composables and no `import.meta.env`.
-
-### Route by path
-
-A resolver also gets the incoming Node request, so it can send a whole API namespace to another application:
-
-```ts
-export default defineMultiAppResolver(
-  () => (host, request) => (request.url?.startsWith("/api/rpc/") ? "tenant" : undefined),
-)
-```
-
-**Warning.** Do not route a single HTML path that way: the page's assets and HMR requests live under different paths and would still go elsewhere.
+**Caveat.** Startup happens before any application boots, so the file can use `import.meta.env` and ordinary project modules, but no Nuxt composables.
 
 ## Configuring child applications
 
