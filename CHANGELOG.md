@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.2.1
+
+### Patch Changes
+
+- d080281: Keep late Nitro output mutations attached to the root application handler instead of the multiplexer.
+
 ## 0.2.0
 
 ### Minor Changes
