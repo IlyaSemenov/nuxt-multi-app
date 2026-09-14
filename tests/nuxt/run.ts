@@ -428,6 +428,11 @@ try {
           nuxt: nuxtVersion,
           "nuxt-multi-app": `file:${archive}`,
         },
+        // The package declares `@types/node` as an optional peer, so a consumer supplies the Node
+        // typings its own application sources rely on, matching the Node major the tests run on.
+        devDependencies: {
+          "@types/node": "^24",
+        },
       },
       null,
       2,
