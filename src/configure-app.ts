@@ -68,8 +68,8 @@ function appIdDeclaration(ids: string[]) {
     "",
     'declare module "nuxt-multi-app/runtime" {',
     "  interface NuxtMultiAppRegistry {",
-    // Property values carry no data; only their keys form the configured AppId union.
-    ...ids.map((id) => `    ${JSON.stringify(id)}: unknown`),
+    // Self-valued properties make TypeScript print the literal AppId union in diagnostics.
+    ...ids.map((id) => `    ${JSON.stringify(id)}: ${JSON.stringify(id)}`),
     "  }",
     "}",
     "export {}",

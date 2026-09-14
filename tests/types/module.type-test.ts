@@ -11,8 +11,8 @@ import type { NuxtMultiAppRequestContext } from "nuxt-multi-app/runtime"
 
 declare module "nuxt-multi-app/runtime" {
   interface NuxtMultiAppRegistry {
-    root: unknown
-    web: unknown
+    root: "root"
+    web: "web"
   }
 }
 

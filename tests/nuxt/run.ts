@@ -362,6 +362,25 @@ async function assertProjectModuleTypeProfile() {
     ),
     [],
   )
+
+  const diagnosticProbe = join(workspace, "root/server/app-id-diagnostic.type-test.ts")
+  await writeFile(
+    diagnosticProbe,
+    'import type { NuxtMultiAppRequestContext } from "nuxt-multi-app/runtime"\ndeclare const context: NuxtMultiAppRequestContext\ncontext.dispatch("website", new Request("http://internal"))\n',
+  )
+  try {
+    const diagnostics = diagnosticsFor(
+      diagnosticProbe,
+      join(workspace, "root/.nuxt/tsconfig.server.json"),
+    )
+    assert.equal(diagnostics.length, 1)
+    assert.match(
+      ts.flattenDiagnosticMessageText(diagnostics[0]!.messageText, "\n"),
+      /parameter of type '"root" \| "web"'/,
+    )
+  } finally {
+    await rm(diagnosticProbe)
+  }
 }
 
 async function assertResolverStartupFailure(command: string[], cwd: string) {

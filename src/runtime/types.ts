@@ -4,7 +4,7 @@ export interface NuxtMultiAppRegistry {}
 /** Configured application ID, or any string before generated project types are available. */
 export type AppId = keyof NuxtMultiAppRegistry extends never
   ? string
-  : Extract<keyof NuxtMultiAppRegistry, string>
+  : Extract<NuxtMultiAppRegistry[keyof NuxtMultiAppRegistry], string>
 
 /** Options for a server-side application dispatch. */
 export interface NuxtMultiAppDispatchOptions {
