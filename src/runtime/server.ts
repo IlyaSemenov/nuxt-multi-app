@@ -50,7 +50,6 @@ for (const [index, rule] of manifest.routing.entries()) {
     ...guards,
     resolver: await loadFactory<MultiAppResolver>(
       new URL(resolver, import.meta.url).href,
-      ids,
       `resolver in routing rule ${index + 1}`,
     ),
   })
@@ -58,7 +57,6 @@ for (const [index, rule] of manifest.routing.entries()) {
 const stateHandler = manifest.stateHandler
   ? await loadFactory<MultiAppStateHandler>(
       new URL(manifest.stateHandler, import.meta.url).href,
-      ids,
       "state handler",
     )
   : defaultStateHandler

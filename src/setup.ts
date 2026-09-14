@@ -81,7 +81,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   nuxt.hook("listen", async (server: Server) => {
     publicServer = server
     rootAdapter.attach(server)
-    const [routing, stateHandler] = await loadDevModules(options, ids, nuxt)
+    const [routing, stateHandler] = await loadDevModules(options, nuxt)
     children = options.apps.map((app) =>
       createChild(app, nuxt, ids, gateway, stateHandler, options.debug),
     )
@@ -115,7 +115,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   })
 }
 
-async function loadDevModules(options: NormalizedModuleOptions, ids: string[], nuxt: Nuxt) {
+async function loadDevModules(options: NormalizedModuleOptions, nuxt: Nuxt) {
   const outputDir = resolve(nuxt.options.buildDir, MODULE_OUTPUT_DIR)
   async function load<T extends (...args: never[]) => unknown>(
     input: string,
@@ -124,7 +124,7 @@ async function loadDevModules(options: NormalizedModuleOptions, ids: string[], n
     const output = resolve(outputDir, module.file)
     await bundleProjectModule(input, output, nuxt)
     // The query defeats the ESM cache, so a full Nuxt restart imports the freshly bundled module.
-    return loadFactory<T>(`${pathToFileURL(output).href}?t=${Date.now()}`, ids, module.name)
+    return loadFactory<T>(`${pathToFileURL(output).href}?t=${Date.now()}`, module.name)
   }
   const routing: RuntimeRoutingRule[] = []
   for (const [index, rule] of options.routing.entries()) {

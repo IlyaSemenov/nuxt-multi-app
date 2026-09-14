@@ -38,16 +38,8 @@ export type MultiAppResolver = (
   request: IncomingMessage,
 ) => AppId | false | undefined | Promise<AppId | false | undefined>
 
-/** Values available while a project runtime extension is initialized at server startup. */
-export interface MultiAppStartupContext {
-  /** Every application ID accepted by routing and dispatch in configuration order. */
-  appIds: ReadonlySet<AppId>
-}
-
 /** A project module factory that initializes one resolver before requests are accepted. */
-export type MultiAppResolverFactory = (
-  context: MultiAppStartupContext,
-) => MultiAppResolver | Promise<MultiAppResolver>
+export type MultiAppResolverFactory = () => MultiAppResolver | Promise<MultiAppResolver>
 
 interface MultiAppRoutingGuards {
   /** Exact hosts or leading-wildcard host patterns, matched with OR semantics. */
@@ -69,9 +61,7 @@ export type MultiAppStateHandler = (
 ) => void | Promise<void>
 
 /** A project module factory that initializes one state handler before requests are accepted. */
-export type MultiAppStateHandlerFactory = (
-  context: MultiAppStartupContext,
-) => MultiAppStateHandler | Promise<MultiAppStateHandler>
+export type MultiAppStateHandlerFactory = () => MultiAppStateHandler | Promise<MultiAppStateHandler>
 
 /** Directory the module owns inside a Nitro output or Nuxt build directory. */
 export const MODULE_OUTPUT_DIR = "nuxt-multi-app"

@@ -53,15 +53,11 @@ void invalidRule
 void (undefined as unknown as MultiAppState)
 
 const overrides: AppOverrides = { ssr: false }
-const createResolver = defineMultiAppResolver(({ appIds }) => {
-  if (!appIds.has("root")) throw new Error("root is not mounted")
-  return (host) => (host === "example.test" ? "root" : undefined)
-})
-const createStateHandler = defineMultiAppStateHandler(({ appIds }) => {
-  if (!appIds.has("web")) throw new Error("web is not mounted")
-  return (_state, _request, response) => {
-    response.end()
-  }
+const createResolver = defineMultiAppResolver(
+  () => (host) => (host === "example.test" ? "root" : undefined),
+)
+const createStateHandler = defineMultiAppStateHandler(() => (_state, _request, response) => {
+  response.end()
 })
 
 void overrides

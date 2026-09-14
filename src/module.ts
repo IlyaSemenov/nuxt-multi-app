@@ -11,7 +11,6 @@ export type {
   MultiAppResolver,
   MultiAppResolverFactory,
   MultiAppRoutingRule,
-  MultiAppStartupContext,
   MultiAppState,
   MultiAppStateHandler,
   MultiAppStateHandlerFactory,

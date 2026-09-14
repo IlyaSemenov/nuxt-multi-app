@@ -1,36 +1,30 @@
-import type { MultiAppStartupContext } from "../options"
-import type { AppId } from "./types"
-
-/** Default export of a project module: receives the startup context and returns the runtime function. */
-type Factory<T> = (context: MultiAppStartupContext) => T | Promise<T>
+/** Default export of a project module: initializes and returns the runtime function. */
+type Factory<T> = () => T | Promise<T>
 
 /**
  * Import a bundled project module and initialize its default-exported factory once at startup.
  *
- * `name` identifies the module in error messages; `appIds` become the factory's startup context.
+ * `name` identifies the module in error messages.
  */
 export async function loadFactory<T extends (...args: never[]) => unknown>(
   url: string,
-  appIds: string[],
   name: string,
 ): Promise<T> {
   const module = (await import(url)) as { default?: unknown }
   if (typeof module.default !== "function") {
     throw new TypeError(`nuxt-multi-app: ${name} module must default-export a factory function`)
   }
-  return initializeFactory(module.default as Factory<T>, appIds, name)
+  return initializeFactory(module.default as Factory<T>, name)
 }
 
 /** Run a project factory once and reject anything but a function as its result. */
 export async function initializeFactory<T extends (...args: never[]) => unknown>(
   factory: Factory<T>,
-  appIds: string[],
   name: string,
 ): Promise<T> {
   let initialized: T
   try {
-    // IDs originate from the validated application registry that generated the AppId union.
-    initialized = await factory({ appIds: new Set(appIds as AppId[]) })
+    initialized = await factory()
   } catch (cause) {
     throw new Error(`nuxt-multi-app: ${name} initialization failed`, { cause })
   }

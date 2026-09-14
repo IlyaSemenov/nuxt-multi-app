@@ -5,17 +5,12 @@ import type { MultiAppResolver, MultiAppStateHandler } from "../options"
 import { initializeFactory } from "./factories"
 
 describe("runtime factory initialization", () => {
-  it("passes known application IDs and initializes once", async () => {
+  it("initializes a resolver once", async () => {
     let calls = 0
-    const resolver = await initializeFactory<MultiAppResolver>(
-      ({ appIds }) => {
-        calls++
-        expect([...appIds]).toEqual(["root", "web"])
-        return () => "root"
-      },
-      ["root", "web"],
-      "resolver",
-    )
+    const resolver = await initializeFactory<MultiAppResolver>(() => {
+      calls++
+      return () => "root"
+    }, "resolver")
 
     expect(await resolver("example.test", {} as never)).toBe("root")
     expect(calls).toBe(1)
@@ -23,25 +18,17 @@ describe("runtime factory initialization", () => {
 
   it("reports initialization failures as startup errors", async () => {
     await expect(
-      initializeFactory(
-        () => {
-          throw new Error("missing APP_BASE_URL")
-        },
-        ["root"],
-        "resolver",
-      ),
+      initializeFactory(() => {
+        throw new Error("missing APP_BASE_URL")
+      }, "resolver"),
     ).rejects.toThrow("resolver initialization failed")
   })
 
   it("initializes a state handler through the same startup contract", async () => {
     const handler = await initializeFactory<MultiAppStateHandler>(
-      ({ appIds }) => {
-        expect([...appIds]).toEqual(["root"])
-        return (_state, _request, response) => {
-          response.end("custom")
-        }
+      () => (_state, _request, response) => {
+        response.end("custom")
       },
-      ["root"],
       "state handler",
     )
     let body: string | undefined

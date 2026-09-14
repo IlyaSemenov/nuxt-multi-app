@@ -5,13 +5,10 @@ import { defineMultiAppResolver } from "nuxt-multi-app"
 const output = process.env.NUXT_MULTI_APP_TEST_RESOLVER_OUTPUT
 if (output) appendFileSync(output, "import\n")
 
-export default defineMultiAppResolver(({ appIds }) => {
+export default defineMultiAppResolver(() => {
   if (output) appendFileSync(output, "initialize\n")
   if (import.meta.env.NUXT_MULTI_APP_TEST_RESOLVER_FAIL) {
     throw new Error("intentional resolver initialization failure")
-  }
-  for (const id of ["root", "web"] as const) {
-    if (!appIds.has(id)) throw new Error(`fixture requires application ${id}`)
   }
   const runtimeBase = process.env.NUXT_MULTI_APP_TEST_BASE
   return (host) => {

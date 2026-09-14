@@ -123,11 +123,11 @@ multiApp: {
 }
 ```
 
-The outer function runs once at startup.
-The function it returns runs when a request reaches the resolver rule and its guards match.
-Startup gets `appIds`, the set of configured IDs — check it if you want a misconfigured project to fail before the server takes traffic.
+`defineMultiAppResolver()` accepts a resolver factory.
+The factory runs once during server startup and returns a resolver.
 
-Per request, return:
+The resolver runs when a request reaches its routing rule and all guards match.
+For that request, return:
 
 - an application ID to route there;
 - `undefined` to continue with the next rule;
@@ -136,7 +136,7 @@ Per request, return:
 A resolver rule may also have `hosts` and `paths` guards.
 If a guard does not match, the resolver is not called; if every guard matches, the resolver decides according to the return values above.
 
-**Caveat.** Startup happens before any application boots, so the file can use `import.meta.env` and ordinary project modules, but no Nuxt composables.
+**Caveat.** The resolver factory runs outside every application's Nuxt context, so it can use `import.meta.env` and ordinary project modules, but no Nuxt composables.
 
 ## Configuring child applications
 
@@ -266,8 +266,9 @@ multiApp: {
 }
 ```
 
-The outer function runs once at startup, and the file and its dependencies are bundled into the production output.
-The handler it returns answers:
+`defineMultiAppStateHandler()` accepts a factory that runs once during server startup.
+The file and its dependencies are bundled into the production output.
+The state handler returned by the factory answers:
 
 - `unmatched`: no application matched the request;
 - `resolver-error`: the resolver threw;
