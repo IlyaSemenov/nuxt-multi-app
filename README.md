@@ -283,23 +283,24 @@ Run `nuxt build` on the root application; it builds every child and writes one p
 
 ```sh
 npx nuxt build apps/landing
-node apps/landing/.output/nuxt-multi-app/server.mjs
+npx nuxt preview apps/landing
+# or: node apps/landing/.output/server/index.mjs
 ```
 
 Everything lands in the root application's `.output`:
 
 ```text
 .output/
-├── public/              # root application's public assets
-├── server/              # root application's Nitro bundle
+├── nitro.json           # Nitro build metadata and preview command
+├── server/index.mjs     # process entry point
 └── nuxt-multi-app/
-    ├── apps/<app-id>/   # Nitro bundle and public assets per child
+    ├── apps/<app-id>/   # Nitro bundle and public assets for every application
     ├── manifest.json    # routing configuration the server reads
-    ├── report.json      # what was built and how requests are routed
-    └── server.mjs       # process entry point
+    └── report.json      # what was built and how requests are routed
 ```
 
-The root application keeps the ordinary Nitro output it would have built on its own, and the entry imports it as one more application.
+The root application uses the same `nuxt-multi-app/apps/<app-id>` layout as its children.
+The standard Nitro entry combines those isolated outputs behind one server process.
 
 The entry listens on `NITRO_PORT` or `PORT`, default `3000`, and on `NITRO_HOST` or `HOST` when one is set, like Nitro's `node-server` preset.
 

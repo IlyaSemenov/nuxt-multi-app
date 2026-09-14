@@ -13,7 +13,7 @@ import { requestPath, sendReadiness } from "./request"
 import { normalizeHost, selectApplication } from "./routing"
 import { defaultStateHandler } from "./state"
 
-/** Routing configuration that `nuxt build` writes beside this entry. */
+/** Routing configuration that `nuxt build` writes in the module-owned output directory. */
 interface Manifest {
   apps: { id: string; hosts: string[]; entry: string }[]
   fallback: string | false
@@ -35,7 +35,7 @@ interface App {
 }
 
 const manifest = JSON.parse(
-  await readFile(new URL("./manifest.json", import.meta.url), "utf8"),
+  await readFile(new URL("../nuxt-multi-app/manifest.json", import.meta.url), "utf8"),
 ) as Manifest
 const ids = manifest.apps.map(({ id }) => id)
 const resolver = manifest.resolver

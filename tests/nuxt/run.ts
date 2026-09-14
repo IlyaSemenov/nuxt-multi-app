@@ -382,7 +382,7 @@ async function assertStaticProductionRouting(cwd: string) {
 
   const port = await unusedPort()
   const origin = `http://127.0.0.1:${port}`
-  const child = Bun.spawn(["node", "output/nuxt-multi-app/server.mjs"], {
+  const child = Bun.spawn(["node", "output/server/index.mjs"], {
     cwd,
     env: { ...process.env, HOST: "127.0.0.1", PORT: String(port) },
     stdout: "pipe",
@@ -406,6 +406,31 @@ async function assertStaticProductionRouting(cwd: string) {
     assert.equal(await child.exited, 0)
   }
   assert.match(await stdout, /\[nuxt-multi-app] routing: hosts; fallback: 404/)
+}
+
+async function assertNuxtPreview(cwd: string) {
+  const port = await unusedPort()
+  const origin = `http://127.0.0.1:${port}`
+  const child = Bun.spawn(
+    ["node", "node_modules/nuxt/bin/nuxt.mjs", "preview", "root", "--port", String(port)],
+    {
+      cwd,
+      env: { ...process.env, HOST: "127.0.0.1", NUXT_TELEMETRY_DISABLED: "1" },
+      stdout: "inherit",
+      stderr: "inherit",
+      detached: process.platform !== "win32",
+    },
+  )
+  try {
+    await waitUntilReady(origin, child)
+    await assertResponse(origin, "/", hosts.root, 200, "ROOT_HMR_0")
+  } finally {
+    if (child.exitCode === null) {
+      if (process.platform === "win32") child.kill("SIGKILL")
+      else process.kill(-child.pid, "SIGTERM")
+      await child.exited
+    }
+  }
 }
 
 function diagnosticsFor(file: string, configPath: string) {
@@ -481,10 +506,21 @@ try {
     await readFile(join(workspace, "root/.output/nuxt-multi-app/report.json"), "utf8"),
   )
   assert.equal(report.routing, "resolver-and-hosts")
-  await checkServer(["node", "root/.output/nuxt-multi-app/server.mjs"], workspace, "production")
+  assert.equal(report.entry, "server/index.mjs")
+  assert.deepEqual(
+    report.apps.map((app: { id: string; entry: string }) => [app.id, app.entry]),
+    [
+      ["root", "../nuxt-multi-app/apps/root/server/index.mjs"],
+      ["web", "../nuxt-multi-app/apps/web/server/index.mjs"],
+    ],
+  )
+  const nitro = JSON.parse(await readFile(join(workspace, "root/.output/nitro.json"), "utf8"))
+  assert.equal(nitro.commands.preview, "node ./server/index.mjs")
+  await assertNuxtPreview(workspace)
+  await checkServer(["node", "root/.output/server/index.mjs"], workspace, "production")
   await cp(join(workspace, "root/.output"), join(portable, "output"), { recursive: true })
-  await checkServer(["node", "output/nuxt-multi-app/server.mjs"], portable, "portable")
-  await assertResolverStartupFailure(["node", "output/nuxt-multi-app/server.mjs"], portable)
+  await checkServer(["node", "output/server/index.mjs"], portable, "portable")
+  await assertResolverStartupFailure(["node", "output/server/index.mjs"], portable)
   await assertStaticProductionRouting(portable)
 } finally {
   await rm(workspace, { recursive: true, force: true })

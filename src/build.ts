@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import { dirname, relative, resolve, sep } from "node:path"
 
 import { buildNuxt, createResolver, loadNuxt } from "@nuxt/kit"
@@ -19,42 +19,63 @@ const serverEntry = resolver.resolve("./runtime/server.js")
 /** Build every application as an isolated handler and write the common production entry. */
 export function setupProductionBuild(options: NormalizedModuleOptions, root: Nuxt) {
   applyHandlerOutput(root.options.nitro, options.root.id)
-  const rootEntry = captureServerEntry(root)
-  let outputDir: string | undefined
-  root.hook("nitro:init", (nitro) => {
-    outputDir = nitro.options.output.dir
-  })
+  const rootOutput = captureNitroOutput(root)
   root.hook("ready", () => {
     // Nitro cleans and writes the root output from a `build:done` hook it registers while Nuxt
     // becomes ready; registering afterwards lets children build into the finished directory.
     root.hook("build:done", async () => {
-      if (!outputDir) throw new Error("nuxt-multi-app: root Nitro output is unknown")
-      const entries = [{ id: options.root.id, hosts: options.root.hosts, entry: rootEntry() }]
+      const output = rootOutput()
+      // Relocate only after Nitro finishes so its configured output root and top-level build
+      // metadata remain the canonical output discovered by `nuxt preview`.
+      const rootEntry = await relocateRootOutput(output, options.root.id)
+      const entries = [{ id: options.root.id, hosts: options.root.hosts, entry: rootEntry }]
       for (const app of options.apps) {
         entries.push({
           id: app.id,
           hosts: app.hosts,
           entry: await buildChild(
             app,
-            outputDir,
+            output.dir,
             options.allApps.map(({ id }) => id),
           ),
         })
       }
-      await writeProductionServer(outputDir, entries, options, root)
+      await writeProductionServer(output.dir, entries, options, root)
     })
   })
 }
 
-function captureServerEntry(nuxt: Nuxt) {
-  let entry: string | undefined
+interface NitroOutput {
+  dir: string
+  publicDir: string
+  serverDir: string
+  entry: string
+}
+
+function captureNitroOutput(nuxt: Nuxt) {
+  let output: NitroOutput | undefined
   nuxt.hook("nitro:init", (nitro) => {
-    entry = resolve(nitro.options.output.serverDir, "index.mjs")
+    output = {
+      ...nitro.options.output,
+      entry: resolve(nitro.options.output.serverDir, "index.mjs"),
+    }
   })
   return () => {
-    if (!entry) throw new Error("nuxt-multi-app: Nitro was not initialized")
-    return entry
+    if (!output) throw new Error("nuxt-multi-app: Nitro was not initialized")
+    return output
   }
+}
+
+/** Move the root handler under the same registry layout as every mounted application. */
+async function relocateRootOutput(output: NitroOutput, id: string) {
+  const appDir = resolve(output.dir, MODULE_OUTPUT_DIR, "apps", id)
+  await mkdir(appDir, { recursive: true })
+  await rename(output.serverDir, resolve(appDir, "server"))
+  await rename(output.publicDir, resolve(appDir, "public"))
+  // Preserve the root handler's own Nitro metadata before the top-level copy is changed to launch
+  // the multiplexer.
+  await copyFile(resolve(output.dir, "nitro.json"), resolve(appDir, "nitro.json"))
+  return resolve(appDir, "server", relative(output.serverDir, output.entry))
 }
 
 async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: string[]) {
@@ -75,7 +96,7 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
   })
   configureNuxtApp(child, app, { ids })
   applyHandlerOutput(child.options.nitro, app.id)
-  const entry = captureServerEntry(child)
+  const output = captureNitroOutput(child)
   try {
     await withGlobalNuxtContext(child, async () => {
       await child.ready()
@@ -84,7 +105,7 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
   } finally {
     await child.close()
   }
-  return entry()
+  return output().entry
 }
 
 async function writeProductionServer(
@@ -95,6 +116,7 @@ async function writeProductionServer(
 ) {
   const entry = resolve(outputDir, PRODUCTION_ENTRY)
   const entryDir = dirname(entry)
+  const moduleDir = resolve(outputDir, MODULE_OUTPUT_DIR)
   // The output runs without this package installed, so the entry is bundled from the built runtime.
   await bundleForOutput(serverEntry, entry)
 
@@ -103,8 +125,9 @@ async function writeProductionServer(
     const input = options[key]
     if (!input) continue
     const { file } = PROJECT_MODULES[key]
-    await bundleProjectModule(input, resolve(entryDir, file), nuxt)
-    projectModules[key] = `./${file}`
+    const output = resolve(moduleDir, file)
+    await bundleProjectModule(input, output, nuxt)
+    projectModules[key] = toRelativeUrl(entryDir, output)
   }
 
   const apps = entries.map((app) => ({ ...app, entry: toRelativeUrl(entryDir, app.entry) }))
@@ -116,9 +139,9 @@ async function writeProductionServer(
     shutdownTimeout: options.shutdownTimeout,
     debug: options.debug,
   }
-  await writeFile(resolve(entryDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
+  await writeFile(resolve(moduleDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
   await writeFile(
-    resolve(entryDir, "report.json"),
+    resolve(moduleDir, "report.json"),
     `${JSON.stringify(
       {
         entry: PRODUCTION_ENTRY,
@@ -129,7 +152,20 @@ async function writeProductionServer(
       2,
     )}\n`,
   )
+  await setPreviewCommand(outputDir)
   logger.info(`entry ${entry}`)
+}
+
+/** Point Nitro-compatible launchers at the multiplexer instead of an import-only app handler. */
+async function setPreviewCommand(outputDir: string) {
+  const path = resolve(outputDir, "nitro.json")
+  const buildInfo = JSON.parse(await readFile(path, "utf8")) as {
+    commands?: { preview?: string; deploy?: string }
+  }
+  buildInfo.commands ??= {}
+  // Nuxt runs this command with the Nitro output directory as its working directory.
+  buildInfo.commands.preview = `node ./${PRODUCTION_ENTRY}`
+  await writeFile(path, `${JSON.stringify(buildInfo, null, 2)}\n`)
 }
 
 function routingMode(hasResolver: boolean, apps: { hosts: string[] }[]) {

@@ -67,7 +67,7 @@ export type MultiAppStateHandlerFactory = (
 export const MODULE_OUTPUT_DIR = "nuxt-multi-app"
 
 /** Generated production entry, relative to the root Nitro output directory. */
-export const PRODUCTION_ENTRY = `${MODULE_OUTPUT_DIR}/server.mjs`
+export const PRODUCTION_ENTRY = "server/index.mjs"
 
 /** Project modules bundled into generated output, keyed by their `ModuleOptions` field. */
 export const PROJECT_MODULES = {
