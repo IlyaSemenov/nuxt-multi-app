@@ -6,6 +6,7 @@ import process from "node:process"
 import type { Duplex } from "node:stream"
 import { fileURLToPath } from "node:url"
 
+import { nuxtCtx } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
 import { toNodeListener } from "h3"
 import MagicString from "magic-string"
@@ -18,6 +19,29 @@ const SUPPORTED_NUXT = "~4.5.2"
 export function assertSupportedNuxt(nuxt: Nuxt) {
   if (!satisfies(nuxt._version, SUPPORTED_NUXT)) {
     throw new Error(`nuxt-multi-app: unsupported Nuxt ${nuxt._version}; expected ${SUPPORTED_NUXT}`)
+  }
+}
+
+/**
+ * Run an application's load phase while it owns the global Kit context.
+ *
+ * `useNuxt()` reads the async-local context first and the global one as a fallback, and the global
+ * one belongs to whichever instance loads first — the root — until that instance closes. Nuxt wraps
+ * its own hook calls in the async context, but a module that registers from a callback outside them,
+ * such as one Vite, Nitro, or a watcher invokes, falls through to the global context: its
+ * `addServerImports()`, `addPlugin()` and friends would then land on the root while the child that
+ * asked for them builds without them.
+ *
+ * Applications load one at a time, so the previous owner is always back before the next claim.
+ */
+export async function withGlobalNuxtContext(nuxt: Nuxt, load: (nuxt: Nuxt) => Promise<void>) {
+  const previous = nuxtCtx.tryUse()
+  nuxtCtx.set(nuxt, true)
+  try {
+    await load(nuxt)
+  } finally {
+    if (previous) nuxtCtx.set(previous, true)
+    else nuxtCtx.unset()
   }
 }
 

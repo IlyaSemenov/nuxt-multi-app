@@ -1,12 +1,26 @@
 import { appendFile } from "node:fs/promises"
 import { setTimeout } from "node:timers/promises"
 
-import { defineNuxtModule, useNuxt } from "nuxt/kit"
+import { defineNuxtModule, nuxtCtx, useNuxt } from "nuxt/kit"
 
 /** Observe overlapping Nuxt contexts and verify that each generation releases its Vite resources. */
 export default defineNuxtModule({
   meta: { name: "nuxt-multi-app-context-probe" },
   setup(_options, nuxt) {
+    // `useNuxt()` falls back to the global Kit context whenever a registration runs outside the
+    // async context Nuxt wraps its own hooks in, so the loading application has to own it from its
+    // first module until its build finishes. Both ends of that window are checked by instance, not
+    // by path: two generations of the same mounted application overlap while one is retiring.
+    for (const hook of ["modules:done", "build:done"] as const) {
+      nuxt.hook(hook, () => {
+        const owner = nuxtCtx.tryUse()
+        if (owner !== nuxt) {
+          const id = owner?.options.rootDir ?? "nobody"
+          throw new Error(`nuxt-multi-app: ${id} owns the global Nuxt context at ${hook}`)
+        }
+      })
+    }
+
     const output = process.env.NUXT_MULTI_APP_TEST_OUTPUT
     if (!process.env.NUXT_MULTI_APP_TEST || !output) return
 

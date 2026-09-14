@@ -5,7 +5,13 @@ import type { Duplex } from "node:stream"
 import { buildNuxt, loadNuxt, writeTypes } from "@nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
-import { getDevHandler, getDevUpgrade, setupDevAdapter, watchChildConfig } from "./compat"
+import {
+  getDevHandler,
+  getDevUpgrade,
+  setupDevAdapter,
+  watchChildConfig,
+  withGlobalNuxtContext,
+} from "./compat"
 import { configureNuxtApp } from "./configure-app"
 import type { GatewayAddress } from "./gateway"
 import { logger } from "./logger"
@@ -55,11 +61,15 @@ export function createChild(
     nuxt.hook("restart", (options) => {
       if (!closing) return root.callHook("restart", options)
     })
-    await nuxt.ready()
-    if (closing) return
-    watchChildConfig(nuxt)
-    await nuxt.runWithContext(() => writeTypes(nuxt!))
-    await buildNuxt(nuxt)
+    // Only loading claims the global context: once the application is mounted it serves requests
+    // through its own async context, and the root owns the global one again.
+    await withGlobalNuxtContext(nuxt, async (nuxt) => {
+      await nuxt.ready()
+      if (closing) return
+      watchChildConfig(nuxt)
+      await nuxt.runWithContext(() => writeTypes(nuxt))
+      await buildNuxt(nuxt)
+    })
     if (closing) return
     handler = getDevHandler(nuxt)
     appUpgrade = getDevUpgrade(nuxt)

@@ -6,6 +6,7 @@ import type {} from "@nuxt/nitro-server"
 import type { Nuxt } from "nuxt/schema"
 
 import { bundleForOutput, bundleProjectModule } from "./bundle"
+import { withGlobalNuxtContext } from "./compat"
 import { applyHandlerOutput, configureNuxtApp } from "./configure-app"
 import { logger } from "./logger"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
@@ -76,8 +77,10 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
   applyHandlerOutput(child.options.nitro, app.id)
   const entry = captureServerEntry(child)
   try {
-    await child.ready()
-    await buildNuxt(child)
+    await withGlobalNuxtContext(child, async () => {
+      await child.ready()
+      await buildNuxt(child)
+    })
   } finally {
     await child.close()
   }

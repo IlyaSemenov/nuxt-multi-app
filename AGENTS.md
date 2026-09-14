@@ -27,6 +27,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Preserve the caller's headers and Host as request data without forwarding any additional headers automatically.
 - Keep each child configuration independent; only documented mount overrides may cross from the root into a child.
 - Run production handlers, internal fetches, and close hooks inside the target application's async-local context.
+- Load a mounted application while it owns the global Kit context, and hand that context back afterwards; load children one at a time so the owner is never shared.
 - Reject build settings that defeat the documented module-instance isolation guarantee.
 - Keep Nuxt, Nitro, and Vite private API adaptations in `src/compat.ts`.
 - Embed each application's Vite bridge options as literals in its Nitro bundle, including after renaming the bridge's `process` import.
