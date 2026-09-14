@@ -527,6 +527,13 @@ try {
       ["web", "../nuxt-multi-app/apps/web/server/index.mjs"],
     ],
   )
+  const rootEntry = await readFile(
+    join(workspace, "root/.output/nuxt-multi-app/apps/root/server/index.mjs"),
+    "utf8",
+  )
+  assert.match(rootEntry, /import "\.\/late-nitro-output\.mjs"/)
+  const productionEntry = await readFile(join(workspace, "root/.output/server/index.mjs"), "utf8")
+  assert.doesNotMatch(productionEntry, /late-nitro-output/)
   const nitro = JSON.parse(await readFile(join(workspace, "root/.output/nitro.json"), "utf8"))
   assert.equal(nitro.commands.preview, "node ./server/index.mjs")
   await assertNuxtPreview(workspace)

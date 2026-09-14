@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 import { defineNuxtConfig } from "nuxt/config"
 
 import contextProbe from "../context-probe"
+import lateNitroOutput from "../late-nitro-output"
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-09-12",
@@ -10,6 +11,7 @@ export default defineNuxtConfig({
   vite: { server: { allowedHosts: ["landing.localhost"] } },
   modules: [
     contextProbe,
+    lateNitroOutput,
     [
       "nuxt-multi-app",
       {

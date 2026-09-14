@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { copyFile, readFile, writeFile } from "node:fs/promises"
 import { dirname, relative, resolve, sep } from "node:path"
 
 import { buildNuxt, createResolver, loadNuxt } from "@nuxt/kit"
@@ -24,19 +24,16 @@ const serverEntry = resolver.resolve("./runtime/server.js")
 /** Build every application as an isolated handler and write the common production entry. */
 export function setupProductionBuild(options: NormalizedModuleOptions, root: Nuxt) {
   applyHandlerOutput(root.options.nitro, options.root.id)
-  const rootOutput = captureNitroOutput(root)
+  const rootOutput = captureNitroOutput(root, options.root.id)
   root.hook("ready", () => {
     // Nitro cleans and writes the root output from a `build:done` hook it registers while Nuxt
     // becomes ready; registering afterwards lets children build into the finished directory.
     root.hook("build:done", async () => {
       const output = rootOutput()
-      // Relocate only after Nitro finishes so its configured output root and top-level build
-      // metadata remain the canonical output discovered by `nuxt preview`.
-      const rootEntry = await relocateRootOutput(output, options.root.id)
       const entries = [
         {
           id: options.root.id,
-          entry: rootEntry,
+          entry: output.entry,
         },
       ]
       for (const app of options.apps) {
@@ -49,42 +46,22 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
           ),
         })
       }
-      await writeProductionServer(output.dir, entries, options, root)
+      // Nitro integrations may modify the generated handler from their close hooks, so install the
+      // multiplexer only after Nitro and every other hook registered before the completed build.
+      root.hook("close", async () => {
+        await copyFile(
+          resolve(output.dir, "nitro.json"),
+          resolve(output.dir, MODULE_OUTPUT_DIR, "apps", options.root.id, "nitro.json"),
+        )
+        await writeProductionServer(output.dir, entries, options, root)
+      })
     })
   })
 }
 
 interface NitroOutput {
   dir: string
-  publicDir: string
-  serverDir: string
   entry: string
-}
-
-function captureNitroOutput(nuxt: Nuxt) {
-  let output: NitroOutput | undefined
-  nuxt.hook("nitro:init", (nitro) => {
-    output = {
-      ...nitro.options.output,
-      entry: resolve(nitro.options.output.serverDir, "index.mjs"),
-    }
-  })
-  return () => {
-    if (!output) throw new Error("nuxt-multi-app: Nitro was not initialized")
-    return output
-  }
-}
-
-/** Move the root handler under the same registry layout as every mounted application. */
-async function relocateRootOutput(output: NitroOutput, id: string) {
-  const appDir = resolve(output.dir, MODULE_OUTPUT_DIR, "apps", id)
-  await mkdir(appDir, { recursive: true })
-  await rename(output.serverDir, resolve(appDir, "server"))
-  await rename(output.publicDir, resolve(appDir, "public"))
-  // Preserve the root handler's own Nitro metadata before the top-level copy is changed to launch
-  // the multiplexer.
-  await copyFile(resolve(output.dir, "nitro.json"), resolve(appDir, "nitro.json"))
-  return resolve(appDir, "server", relative(output.serverDir, output.entry))
 }
 
 async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: string[]) {
@@ -115,6 +92,26 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
     await child.close()
   }
   return output().entry
+}
+
+/** Capture the Nitro entry, placing the root handler in its final directory when given its ID. */
+function captureNitroOutput(nuxt: Nuxt, rootId?: string) {
+  let output: NitroOutput | undefined
+  nuxt.hook("nitro:init", (nitro) => {
+    if (rootId !== undefined) {
+      const appDir = resolve(nitro.options.output.dir, MODULE_OUTPUT_DIR, "apps", rootId)
+      nitro.options.output.serverDir = resolve(appDir, "server")
+      nitro.options.output.publicDir = resolve(appDir, "public")
+    }
+    output = {
+      dir: nitro.options.output.dir,
+      entry: resolve(nitro.options.output.serverDir, "index.mjs"),
+    }
+  })
+  return () => {
+    if (!output) throw new Error("nuxt-multi-app: Nitro was not initialized")
+    return output
+  }
 }
 
 async function writeProductionServer(
