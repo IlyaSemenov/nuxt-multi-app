@@ -10,7 +10,12 @@ import { withGlobalNuxtContext } from "./compat"
 import { applyHandlerOutput, configureNuxtApp } from "./configure-app"
 import { logger } from "./logger"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
-import { MODULE_OUTPUT_DIR, PRODUCTION_ENTRY, PROJECT_MODULES } from "./options"
+import {
+  MODULE_OUTPUT_DIR,
+  PRODUCTION_ENTRY,
+  PROJECT_MODULES,
+  resolverProjectModule,
+} from "./options"
 import { childOverrides } from "./overrides"
 
 const resolver = createResolver(import.meta.url)
@@ -31,16 +36,12 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
       const entries = [
         {
           id: options.root.id,
-          paths: options.root.paths,
-          hosts: options.root.hosts,
           entry: rootEntry,
         },
       ]
       for (const app of options.apps) {
         entries.push({
           id: app.id,
-          paths: app.paths,
-          hosts: app.hosts,
           entry: await buildChild(
             app,
             output.dir,
@@ -118,7 +119,7 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
 
 async function writeProductionServer(
   outputDir: string,
-  entries: { id: string; paths: string[]; hosts: string[]; entry: string }[],
+  entries: { id: string; entry: string }[],
   options: NormalizedModuleOptions,
   nuxt: Nuxt,
 ) {
@@ -128,21 +129,31 @@ async function writeProductionServer(
   // The output runs without this package installed, so the entry is bundled from the built runtime.
   await bundleForOutput(serverEntry, entry)
 
-  const projectModules = { resolver: null as string | null, stateHandler: null as string | null }
-  for (const key of ["resolver", "stateHandler"] as const) {
-    const input = options[key]
-    if (!input) continue
-    const { file } = PROJECT_MODULES[key]
-    const output = resolve(moduleDir, file)
+  const routing = []
+  for (const [index, rule] of options.routing.entries()) {
+    if ("app" in rule) {
+      routing.push(rule)
+      continue
+    }
+    const { resolver: input, ...guards } = rule
+    const module = resolverProjectModule(index)
+    const output = resolve(moduleDir, module.file)
     await bundleProjectModule(input, output, nuxt)
-    projectModules[key] = toRelativeUrl(entryDir, output)
+    routing.push({ ...guards, resolver: toRelativeUrl(entryDir, output) })
+  }
+
+  let stateHandler: string | null = null
+  if (options.stateHandler) {
+    const output = resolve(moduleDir, PROJECT_MODULES.stateHandler.file)
+    await bundleProjectModule(options.stateHandler, output, nuxt)
+    stateHandler = toRelativeUrl(entryDir, output)
   }
 
   const apps = entries.map((app) => ({ ...app, entry: toRelativeUrl(entryDir, app.entry) }))
   const manifest = {
     apps,
-    fallback: options.fallback,
-    ...projectModules,
+    routing,
+    stateHandler,
     readinessPath: options.readinessPath,
     shutdownTimeout: options.shutdownTimeout,
     debug: options.debug,

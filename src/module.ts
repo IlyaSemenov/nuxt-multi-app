@@ -10,6 +10,7 @@ export type {
   ModuleOptions,
   MultiAppResolver,
   MultiAppResolverFactory,
+  MultiAppRoutingRule,
   MultiAppStartupContext,
   MultiAppState,
   MultiAppStateHandler,

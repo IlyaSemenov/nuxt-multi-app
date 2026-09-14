@@ -10,14 +10,16 @@ import { loadFactory } from "./factories"
 import type { NitroRuntime, ProductionRuntime, UpgradeHandler } from "./registry"
 import { runtimeSymbol } from "./registry"
 import { requestPath, sendReadiness } from "./request"
-import { normalizeHost, selectApplication } from "./routing"
+import { normalizeHost, selectApplication, type RuntimeRoutingRule } from "./routing"
 import { defaultStateHandler } from "./state"
 
 /** Routing configuration that `nuxt build` writes in the module-owned output directory. */
 interface Manifest {
-  apps: { id: string; paths: string[]; hosts: string[]; entry: string }[]
-  fallback: string | false
-  resolver: string | null
+  apps: { id: string; entry: string }[]
+  routing: (
+    | { app: string; hosts?: string[]; paths?: string[] }
+    | { resolver: string; hosts?: string[]; paths?: string[] }
+  )[]
   stateHandler: string | null
   readinessPath?: string
   shutdownTimeout: number
@@ -26,8 +28,6 @@ interface Manifest {
 
 interface App {
   id: string
-  paths: string[]
-  hosts: string[]
   handler: RequestListener
   nitro: NitroRuntime
   upgrade?: UpgradeHandler
@@ -39,13 +39,22 @@ const manifest = JSON.parse(
   await readFile(new URL("../nuxt-multi-app/manifest.json", import.meta.url), "utf8"),
 ) as Manifest
 const ids = manifest.apps.map(({ id }) => id)
-const resolver = manifest.resolver
-  ? await loadFactory<MultiAppResolver>(
-      new URL(manifest.resolver, import.meta.url).href,
+const routing: RuntimeRoutingRule[] = []
+for (const [index, rule] of manifest.routing.entries()) {
+  if ("app" in rule) {
+    routing.push(rule)
+    continue
+  }
+  const { resolver, ...guards } = rule
+  routing.push({
+    ...guards,
+    resolver: await loadFactory<MultiAppResolver>(
+      new URL(resolver, import.meta.url).href,
       ids,
-      "resolver",
-    )
-  : undefined
+      `resolver in routing rule ${index + 1}`,
+    ),
+  })
+}
 const stateHandler = manifest.stateHandler
   ? await loadFactory<MultiAppStateHandler>(
       new URL(manifest.stateHandler, import.meta.url).href,
@@ -125,8 +134,6 @@ for (const definition of manifest.apps) {
   }
   const app: App = {
     id: definition.id,
-    paths: definition.paths,
-    hosts: definition.hosts,
     handler: handler as RequestListener,
     ...registration,
     // Importing the bundle left its own $fetch and import.meta bridge in `latest`; freeze them now.
@@ -136,8 +143,7 @@ for (const definition of manifest.apps) {
   appsById.set(app.id, app)
 }
 
-const choose = (request: IncomingMessage) =>
-  selectApplication(apps, manifest.fallback, resolver, request)
+const choose = (request: IncomingMessage) => selectApplication(apps, routing, request)
 
 const server = createServer((request, response) => {
   if (manifest.readinessPath && requestPath(request) === manifest.readinessPath) {
@@ -291,15 +297,15 @@ server.listen(port, host, () => {
       ? String(address)
       : `http://${address.address}:${address.port}`
   console.log(`[nuxt-multi-app] listening on ${origin}; PID=${process.pid}`)
-  const hasPaths = apps.some((app) => app.paths.length)
-  const hasHosts = apps.some((app) => app.hosts.length)
-  const routing = [hasPaths && "paths", resolver && "resolver", hasHosts && "hosts"]
-    .filter(Boolean)
-    .join("-and-")
-  const fallback = manifest.fallback === false ? "404" : manifest.fallback
-  console.log(`[nuxt-multi-app] routing: ${routing || "fallback"}; fallback: ${fallback}`)
-  for (const app of apps) {
-    if (app.paths.length) console.log(`[nuxt-multi-app] path ${app.paths.join(", ")} -> ${app.id}`)
-    if (app.hosts.length) console.log(`[nuxt-multi-app] ${app.hosts.join(", ")} -> ${app.id}`)
+  console.log(`[nuxt-multi-app] routing: ${routing.length} ordered rules`)
+  for (const [index, rule] of routing.entries()) {
+    const guards = [
+      rule.hosts && `hosts ${rule.hosts.join(", ")}`,
+      rule.paths && `paths ${rule.paths.join(", ")}`,
+    ]
+      .filter(Boolean)
+      .join(" and ")
+    const target = "app" in rule ? rule.app : "resolver"
+    console.log(`[nuxt-multi-app] rule ${index + 1}: ${guards || "*"} -> ${target}`)
   }
 })

@@ -4,9 +4,9 @@ import type { Duplex } from "node:stream"
 
 import type { ChildState } from "./child"
 import { logger } from "./logger"
-import type { MultiAppResolver, MultiAppStateHandler, NormalizedAppOptions } from "./options"
+import type { MultiAppStateHandler, NormalizedAppOptions } from "./options"
 import { requestPath, sendReadiness } from "./runtime/request"
-import { normalizeHost, selectApplication } from "./runtime/routing"
+import { normalizeHost, selectApplication, type RuntimeRoutingRule } from "./runtime/routing"
 
 type UpgradeListener = (request: IncomingMessage, socket: Duplex, head: Buffer) => void
 
@@ -22,9 +22,8 @@ export function installDevRouting(
   server: Server,
   endpoints: DevEndpoint[],
   rootHmr: UpgradeListener,
-  resolver: MultiAppResolver | undefined,
+  routing: RuntimeRoutingRule[],
   stateHandler: MultiAppStateHandler,
-  fallback: string | false,
   readinessPath: string | undefined,
   debug: boolean,
 ) {
@@ -49,8 +48,7 @@ export function installDevRouting(
   async function choose(request: IncomingMessage) {
     return selectApplication(
       endpoints.map((endpoint) => endpoint.options),
-      fallback,
-      resolver,
+      routing,
       request,
     ).then((selected) =>
       selected ? endpoints.find((endpoint) => endpoint.options.id === selected.id) : undefined,

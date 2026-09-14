@@ -2,8 +2,8 @@
 
 Run several independent Nuxt applications behind one HTTP server.
 
-The server routes every request to exactly one application, by hostname or by your own routing code.
-That application keeps its own Nuxt configuration, modules, server routes, styles, assets, and generated types, and owns the entire response and browser bundle for the page.
+Each application keeps its own Nuxt configuration, modules, server routes, styles, assets, and generated types.
+Routing selects one application to handle each request; pages load that application's browser bundle.
 
 Use this when several Nuxt applications have to ship as a single service without merging their configurations.
 It is not client-side microfrontend composition.
@@ -24,9 +24,9 @@ npm install nuxt-multi-app
 
 ## Quick start
 
-One application is the root: you run its `dev` and `build` commands, and its HTTP server accepts every incoming request.
+One application is the root: its `dev` and `build` commands run the whole composition, and its server accepts incoming requests.
 
-Add the module to the root application's `nuxt.config.ts`, then describe the root under `root` and every other application under `apps`:
+Add the module to the root application's `nuxt.config.ts`, declare the applications under `root` and `apps`, then list their routing rules under `routing`:
 
 ```ts
 // apps/landing/nuxt.config.ts
@@ -34,79 +34,76 @@ export default defineNuxtConfig({
   modules: ["nuxt-multi-app"],
 
   multiApp: {
-    root: {
-      id: "landing",
-      hosts: ["example.com", "www.example.com"],
-    },
-    apps: [
-      {
-        id: "tenant",
-        rootDir: "../tenant",
-        hosts: ["*.example.com"],
-      },
+    root: { id: "landing" },
+    apps: [{ id: "tenant", rootDir: "../tenant" }],
+    routing: [
+      { hosts: ["example.com", "www.example.com"], app: "landing" },
+      { hosts: ["*.example.com"], app: "tenant" },
     ],
-    fallback: "tenant",
   },
 })
 ```
 
 Each application declares:
 
-- `id`: the application's unique name;
-- `hosts`, optional: hostnames the application answers on;
-- `paths`, optional: URL path prefixes the application owns on every host;
-- `rootDir`, required for a child: its directory relative to the root application.
+- `id`: unique name; the root may omit it and defaults to `root`;
+- `rootDir`, children only: its directory relative to the root application.
 
 A child loads its own `nuxt.config` and inherits nothing from the root — no modules, plugins, styles, routes, or dependencies.
 
-## Routing requests
+## Routing rules
 
-`nuxt-multi-app` routes each request to a single application.
-To pick it, the server tries in order:
+`nuxt-multi-app` runs `multiApp.routing` from top to bottom and uses the first rule that selects an application.
+Alternatives inside `hosts` or `paths` use OR semantics, while distinct fields in one rule use AND semantics.
+A rule with only `app` matches every request that reaches it.
+If no rule selects an application, the built-in response is 404.
 
-1. the `paths` prefixes of every application;
-2. the resolver from `multiApp.resolver`, if the project has one;
-3. the `hosts` patterns of every application;
-4. the `fallback` application.
+The selected application handles its pages, assets, API routes, HMR, and WebSocket upgrades.
 
-If that turns up nothing, the request gets a 404.
-
-That application then handles everything for the request: the page, its assets, API routes, HMR, and WebSocket upgrades.
+In the quick start, `example.com` and `www.example.com` go to `landing`, subdomains go to `tenant`, and every other host gets a 404.
 
 ### Route by hostname
 
-Use `hosts` when you know the domains at build time.
+Use a `hosts` rule when you know the domains at build time:
+
+```ts
+{ hosts: ["example.com", "*.example.com"], app: "landing" }
+```
 
 You can write an exact hostname, `example.com`, or a leading wildcard, `*.example.com` — it covers `blog.example.com`, but not `example.com` itself.
 Matching ignores case and the port.
-When several applications match, the root wins, then children in configuration order.
-
-`fallback` catches everything else; its default `false` means 404.
-
-In the quick start, `example.com` and `www.example.com` go to `landing`, subdomains go to `tenant`, and any other host falls back to `tenant`.
 
 ### Route by path
 
-Use `paths` when an application owns a complete URL namespace on every host:
+Use a `paths` rule when an application owns a complete URL namespace:
 
 ```ts
 {
-  id: "tenant",
-  rootDir: "../tenant",
   paths: ["/api", "/_e2e"],
+  app: "tenant",
 }
 ```
 
-`/api` matches `/api` and every path below `/api/`, but not `/apix`.
-A trailing slash in configuration is ignored, the query string does not participate in matching, and the longest matching prefix wins.
-The same normalized prefix cannot belong to two applications.
+`/api` matches `/api` and every path below `/api/`, but not `/apiary`.
+The server compares the raw pathname without its query string and without decoding or normalizing path segments.
+A trailing slash in configuration is ignored.
+
+Add both guards to require a host and a path match:
+
+```ts
+{
+  hosts: ["admin.example.com"],
+  paths: ["/internal"],
+  app: "admin",
+}
+```
 
 Do not route a single HTML path this way: the page's assets and HMR requests live under different paths and would still go elsewhere.
 
 ### Route with a resolver
 
-`nuxt build` bakes the module configuration, including `paths` and `hosts`, into the output.
-Use a resolver when one `.output` has to serve different domains — e2e, staging, production — depending on the environment the server starts in:
+`nuxt build` bakes the ordered routing rules into the output.
+Use a resolver when hostnames are known only at runtime, such as when the same `.output` runs in e2e, staging, and production environments:
 
 ```ts
 // apps/landing/multi-app-resolver.ts
@@ -120,18 +117,24 @@ export default defineMultiAppResolver(() => {
 
 ```ts
 multiApp: {
-  resolver: "./multi-app-resolver.ts",
+  routing: [
+    { resolver: "./multi-app-resolver.ts" },
+  ],
 }
 ```
 
-The outer function runs once at startup, and the function it returns runs for every request.
+The outer function runs once at startup.
+The function it returns runs when a request reaches the resolver rule and its guards match.
 Startup gets `appIds`, the set of configured IDs — check it if you want a misconfigured project to fail before the server takes traffic.
 
 Per request, return:
 
 - an application ID to route there;
-- `undefined` to fall through to `hosts` and `fallback`;
+- `undefined` to continue with the next rule;
 - `false` to answer as if nothing matched.
+
+A resolver rule may also have `hosts` and `paths` guards.
+If a guard does not match, the resolver is not called; if every guard matches, the resolver decides according to the return values above.
 
 **Caveat.** Startup happens before any application boots, so the file can use `import.meta.env` and ordinary project modules, but no Nuxt composables.
 
@@ -171,7 +174,7 @@ Ignore it in Git:
 If the repository type-checks generated Nuxt projects, add one TypeScript project per mounted child.
 In the quick start it extends `apps/tenant/.nuxt-multi-app/tenant/tsconfig.json`.
 
-The resolver and state-handler files are added to the root's generated `tsconfig.node.json` for you, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
+Resolver and state-handler files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
 Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
 
 Set `multiApp.buildDir` to rename that directory for every child, or `buildDir` on a single `apps` entry to move one child; both are resolved from the child root.
@@ -220,7 +223,7 @@ Everything above still applies, and the call aborts with the incoming request; a
 In development the call crosses a private local socket; in production it reaches the target's Nitro handler inside the same process.
 
 Both live on the server event, so neither reaches the browser.
-Browser requests arrive at the owning application through `hosts` or the resolver instead.
+Browser requests arrive at the owning application through the configured routing rules instead.
 
 ## Readiness endpoint
 
@@ -241,7 +244,7 @@ Set `multiApp.debug` to add a per-application breakdown to the body.
 
 ## Error responses
 
-When no application serves a request, the built-in answers are 404 for no match and 500 when the resolver fails.
+When no routing rule selects an application, the built-in response is 404; a resolver failure produces 500.
 Development adds 503 while an application is still booting and 500 after one has failed.
 
 Set `stateHandler` to replace those responses with your own:
@@ -314,21 +317,20 @@ The entry listens on `NITRO_PORT` or `PORT`, default `3000`, and on `NITRO_HOST`
 
 On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active responses and dispatch calls up to `shutdownTimeout` to finish, and then closes every application.
 
-## Root configuration
+## Module options
 
 | Option            | Description                                                            | Default           |
 | ----------------- | ---------------------------------------------------------------------- | ----------------- |
-| `root`            | ID and static hosts for the root application.                          | `{ id: "root" }`  |
+| `root`            | ID for the root application.                                           | `{ id: "root" }`  |
 | `apps`            | Child applications to load.                                            | `[]`              |
 | `buildDir`        | Generated directory for mounted children, relative to each child root. | `.nuxt-multi-app` |
-| `resolver`        | Path to a runtime resolver file.                                       | —                 |
-| `fallback`        | Application ID used when no resolver or host matches, or `false`.      | `false`           |
+| `routing`         | Non-empty ordered application and resolver rules.                      | —                 |
 | `stateHandler`    | Path to a custom error-response file.                                  | —                 |
 | `readinessPath`   | Path of a readiness endpoint answered before routing.                  | —                 |
 | `shutdownTimeout` | Maximum shutdown wait in milliseconds.                                 | `30000`           |
 | `debug`           | Log request routing and application lifecycle events.                  | Nuxt `debug`      |
 
-`root` takes only `id` and `hosts`: its directory and Nuxt configuration are those of the application that loads the module.
+`root` accepts only `id` and always refers to the Nuxt application that loads the module.
 
 ## Isolation and limitations
 

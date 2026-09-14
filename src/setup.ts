@@ -20,18 +20,20 @@ import type {
   NormalizedModuleOptions,
   ProjectModule,
 } from "./options"
-import { MODULE_OUTPUT_DIR, PROJECT_MODULES } from "./options"
+import { MODULE_OUTPUT_DIR, PROJECT_MODULES, resolverProjectModule } from "./options"
 import { prepareChildren } from "./prepare"
 import { loadFactory } from "./runtime/factories"
+import type { RuntimeRoutingRule } from "./runtime/routing"
 import { defaultStateHandler } from "./runtime/state"
 
 /** Run the Nuxt module lifecycle for prepare, development, or production build. */
 export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   const options = normalizeOptions(input, nuxt)
   const ids = options.allApps.map((app) => app.id)
-  const projectModules = [options.resolver, options.stateHandler].filter(
-    (path): path is string => path !== undefined,
-  )
+  const projectModules = [
+    ...options.routing.flatMap((rule) => ("resolver" in rule ? [rule.resolver] : [])),
+    ...(options.stateHandler ? [options.stateHandler] : []),
+  ]
   nuxt.options.watch.push(...projectModules)
 
   if (nuxt.options._prepare) {
@@ -79,7 +81,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   nuxt.hook("listen", async (server: Server) => {
     publicServer = server
     rootAdapter.attach(server)
-    const [resolver, stateHandler] = await loadDevModules(options, ids, nuxt)
+    const [routing, stateHandler] = await loadDevModules(options, ids, nuxt)
     children = options.apps.map((app) =>
       createChild(app, nuxt, ids, gateway, stateHandler, options.debug),
     )
@@ -88,9 +90,8 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
       server,
       [rootEndpoint, ...children],
       rootAdapter.upgrade,
-      resolver,
+      routing,
       stateHandler,
-      options.fallback,
       options.readinessPath,
       options.debug,
     )
@@ -125,13 +126,22 @@ async function loadDevModules(options: NormalizedModuleOptions, ids: string[], n
     // The query defeats the ESM cache, so a full Nuxt restart imports the freshly bundled module.
     return loadFactory<T>(`${pathToFileURL(output).href}?t=${Date.now()}`, ids, module.name)
   }
-  const resolver = options.resolver
-    ? await load<MultiAppResolver>(options.resolver, PROJECT_MODULES.resolver)
-    : undefined
+  const routing: RuntimeRoutingRule[] = []
+  for (const [index, rule] of options.routing.entries()) {
+    if ("app" in rule) {
+      routing.push(rule)
+      continue
+    }
+    const { resolver: input, ...guards } = rule
+    routing.push({
+      ...guards,
+      resolver: await load<MultiAppResolver>(input, resolverProjectModule(index)),
+    })
+  }
   const stateHandler = options.stateHandler
     ? await load<MultiAppStateHandler>(options.stateHandler, PROJECT_MODULES.stateHandler)
     : defaultStateHandler
-  return [resolver, stateHandler] as const
+  return [routing, stateHandler] as const
 }
 
 async function startChildren(children: ReturnType<typeof createChild>[], server: Server) {

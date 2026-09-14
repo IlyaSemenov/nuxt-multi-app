@@ -382,13 +382,13 @@ async function assertResolverStartupFailure(command: string[], cwd: string) {
   const exitCode = await child.exited
   clearTimeout(timeout)
   assert.notEqual(exitCode, 0, "Server accepted a failing resolver factory")
-  assert.match(await stderr, /resolver initialization failed/)
+  assert.match(await stderr, /resolver in routing rule 2 initialization failed/)
 }
 
 async function assertStaticProductionRouting(cwd: string) {
   const manifestPath = join(cwd, "output/nuxt-multi-app/manifest.json")
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
-  manifest.resolver = null
+  manifest.routing = manifest.routing.filter((rule: object) => !("resolver" in rule))
   manifest.stateHandler = null
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
@@ -420,7 +420,7 @@ async function assertStaticProductionRouting(cwd: string) {
     child.kill("SIGTERM")
     assert.equal(await child.exited, 0)
   }
-  assert.match(await stdout, /\[nuxt-multi-app] routing: paths-and-hosts; fallback: 404/)
+  assert.match(await stdout, /\[nuxt-multi-app] routing: 3 ordered rules/)
 }
 
 async function assertNuxtPreview(cwd: string) {

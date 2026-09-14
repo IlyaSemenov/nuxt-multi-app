@@ -10,10 +10,6 @@ export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
 export interface RootOptions {
   /** Stable registry ID used by routing and server-side dispatch; defaults to `root`. */
   id?: string
-  /** Absolute path prefixes served by this application on every host. */
-  paths?: string[]
-  /** Exact hosts or leading-wildcard host patterns served by this application. */
-  hosts?: string[]
 }
 
 /** Configuration for an independently loaded Nuxt application. */
@@ -22,10 +18,6 @@ export interface AppOptions {
   id: string
   /** Application root, resolved from the root application's directory. */
   rootDir: string
-  /** Absolute path prefixes served by this application on every host. */
-  paths?: string[]
-  /** Exact hosts or leading-wildcard host patterns served by this application. */
-  hosts?: string[]
   /** Explicit mount-point configuration applied after the child's own configuration. */
   overrides?: AppOverrides
   /** Generated Nuxt directory, resolved from the child application's root. */
@@ -57,6 +49,18 @@ export type MultiAppResolverFactory = (
   context: MultiAppStartupContext,
 ) => MultiAppResolver | Promise<MultiAppResolver>
 
+interface MultiAppRoutingGuards {
+  /** Exact hosts or leading-wildcard host patterns, matched with OR semantics. */
+  hosts?: string[]
+  /** Absolute path prefixes, matched with OR semantics at segment boundaries. */
+  paths?: string[]
+}
+
+/** One ordered routing rule that targets an application or invokes a project resolver. */
+export type MultiAppRoutingRule =
+  | (MultiAppRoutingGuards & { app: string; resolver?: never })
+  | (MultiAppRoutingGuards & { resolver: string; app?: never })
+
 /** A state-handler module renders failures and requests that have no application. */
 export type MultiAppStateHandler = (
   state: MultiAppState,
@@ -77,20 +81,27 @@ export const PRODUCTION_ENTRY = "server/index.mjs"
 
 /** Project modules bundled into generated output, keyed by their `ModuleOptions` field. */
 export const PROJECT_MODULES = {
-  resolver: { file: "resolver.mjs", name: "resolver" },
   stateHandler: { file: "state-handler.mjs", name: "state handler" },
-} as const
+} as const satisfies Record<string, ProjectModule>
 
-export type ProjectModule = (typeof PROJECT_MODULES)[keyof typeof PROJECT_MODULES]
+/** Generated filename and diagnostic label for one bundled project module. */
+export interface ProjectModule {
+  file: string
+  name: string
+}
+
+/** Describe the generated module for a resolver at one routing-list index. */
+export function resolverProjectModule(index: number): ProjectModule {
+  return { file: `resolver-${index + 1}.mjs`, name: `resolver in routing rule ${index + 1}` }
+}
 
 /** Values applied to every option the project leaves unset. */
 export const MODULE_DEFAULTS = {
   root: { id: "root" },
   apps: [] as AppOptions[],
   buildDir: ".nuxt-multi-app",
-  fallback: false,
   shutdownTimeout: 30_000,
-} satisfies ModuleOptions
+} satisfies Omit<ModuleOptions, "routing">
 
 /** Configure the multi-application composition through `multiApp` in nuxt.config. */
 export interface ModuleOptions {
@@ -100,10 +111,8 @@ export interface ModuleOptions {
   apps?: AppOptions[]
   /** Generated Nuxt directory for mounted children, resolved from each child root. */
   buildDir?: string
-  /** Application used when neither the resolver nor host patterns select one. */
-  fallback?: string | false
-  /** Path to a bundled module whose default export is a `MultiAppResolverFactory`. */
-  resolver?: string
+  /** Non-empty ordered first-match routing rules. */
+  routing: MultiAppRoutingRule[]
   /** Path to a bundled module whose default export is a `MultiAppStateHandlerFactory`. */
   stateHandler?: string
   /** HTTP path that reports whether every Nuxt application is ready. */
@@ -118,20 +127,34 @@ export interface ModuleOptions {
 export interface NormalizedAppOptions {
   id: string
   rootDir: string
-  paths: string[]
-  hosts: string[]
   overrides: AppOverrides
   buildDir: string
   isRoot: boolean
 }
+
+/** A validated routing rule that selects an application. */
+export interface NormalizedAppRoutingRule {
+  app: string
+  hosts?: string[]
+  paths?: string[]
+}
+
+/** A validated routing rule whose resolver module is stored as an absolute path. */
+export interface NormalizedResolverRoutingRule {
+  resolver: string
+  hosts?: string[]
+  paths?: string[]
+}
+
+/** A validated rule in configuration order. */
+export type NormalizedRoutingRule = NormalizedAppRoutingRule | NormalizedResolverRoutingRule
 
 /** Fully validated module configuration. */
 export interface NormalizedModuleOptions {
   root: NormalizedAppOptions
   apps: NormalizedAppOptions[]
   allApps: NormalizedAppOptions[]
-  fallback: string | false
-  resolver?: string
+  routing: NormalizedRoutingRule[]
   stateHandler?: string
   readinessPath: string | undefined
   shutdownTimeout: number

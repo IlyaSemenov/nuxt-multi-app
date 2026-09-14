@@ -3,11 +3,13 @@ import { resolve } from "node:path"
 
 import type { Nuxt } from "nuxt/schema"
 
+import { logger } from "./logger"
 import type {
   AppOptions,
   ModuleOptions,
   NormalizedAppOptions,
   NormalizedModuleOptions,
+  NormalizedRoutingRule,
 } from "./options"
 import { MODULE_DEFAULTS } from "./options"
 
@@ -22,8 +24,6 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
   const root: NormalizedAppOptions = {
     id: rootId,
     rootDir,
-    paths: normalizePaths(options.root?.paths ?? []),
-    hosts: normalizeHosts(options.root?.hosts ?? []),
     overrides: {},
     buildDir: nuxt.options.buildDir,
     isRoot: true,
@@ -53,12 +53,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
     buildDirs.add(normalized.buildDir)
     return normalized
   })
-  assertUniquePaths([root, ...apps])
-
-  const fallback = options.fallback ?? MODULE_DEFAULTS.fallback
-  if (fallback !== false && !ids.has(fallback)) {
-    throw new Error(`nuxt-multi-app: fallback references unknown application ${fallback}`)
-  }
+  const routing = normalizeRouting(options.routing, ids, rootDir)
 
   const readinessPath = options.readinessPath
   if (
@@ -77,8 +72,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
     root,
     apps,
     allApps: [root, ...apps],
-    fallback,
-    resolver: resolveModulePath(options.resolver, rootDir),
+    routing,
     stateHandler: resolveModulePath(options.stateHandler, rootDir),
     readinessPath,
     shutdownTimeout,
@@ -100,8 +94,6 @@ function normalizeApp(
   return {
     id: app.id,
     rootDir: appRootDir,
-    paths: normalizePaths(app.paths ?? []),
-    hosts: normalizeHosts(app.hosts ?? []),
     overrides: app.overrides ?? {},
     buildDir: app.buildDir
       ? resolve(appRootDir, app.buildDir)
@@ -142,19 +134,62 @@ function normalizePaths(paths: string[]) {
   })
 }
 
-function assertUniquePaths(apps: NormalizedAppOptions[]) {
-  const owners = new Map<string, string>()
-  for (const app of apps) {
-    for (const path of app.paths) {
-      const owner = owners.get(path)
-      if (owner) {
+/** Validate routing as one explicit first-match program. */
+function normalizeRouting(
+  input: ModuleOptions["routing"] | undefined,
+  ids: Set<string>,
+  rootDir: string,
+): NormalizedRoutingRule[] {
+  if (input === undefined) throw new Error("nuxt-multi-app: routing is required")
+  if (input.length === 0) throw new Error("nuxt-multi-app: routing must not be empty")
+
+  const routing = input.map((rule, index): NormalizedRoutingRule => {
+    const hasApp = typeof rule.app === "string"
+    const hasResolver = typeof rule.resolver === "string"
+    if (hasApp === hasResolver) {
+      throw new Error(
+        `nuxt-multi-app: routing rule ${index + 1} must define exactly one of app or resolver`,
+      )
+    }
+    const hosts = normalizeGuard(rule.hosts, normalizeHosts, "hosts", index)
+    const paths = normalizeGuard(rule.paths, normalizePaths, "paths", index)
+    if (hasApp) {
+      if (!ids.has(rule.app!)) {
         throw new Error(
-          `nuxt-multi-app: path prefix ${path} is assigned to both ${owner} and ${app.id}`,
+          `nuxt-multi-app: routing rule ${index + 1} references unknown application ${rule.app}`,
         )
       }
-      owners.set(path, app.id)
+      if (!hosts && !paths && index !== input.length - 1) {
+        throw new Error(
+          `nuxt-multi-app: unconditional routing rule ${index + 1} must be the last rule`,
+        )
+      }
+      return { app: rule.app!, hosts, paths }
+    }
+    return { resolver: resolveModulePath(rule.resolver, rootDir)!, hosts, paths }
+  })
+
+  if (!routing.some((rule) => "resolver" in rule)) {
+    const referenced = new Set(routing.flatMap((rule) => ("app" in rule ? [rule.app] : [])))
+    for (const id of ids) {
+      if (!referenced.has(id))
+        logger.warn(`application ${id} is not referenced by any routing rule`)
     }
   }
+  return routing
+}
+
+function normalizeGuard(
+  input: string[] | undefined,
+  normalize: (values: string[]) => string[],
+  field: string,
+  index: number,
+) {
+  if (input === undefined) return undefined
+  if (!Array.isArray(input) || input.length === 0) {
+    throw new Error(`nuxt-multi-app: routing rule ${index + 1} ${field} must not be empty`)
+  }
+  return normalize(input)
 }
 
 function resolveModulePath(path: string | undefined, rootDir: string) {

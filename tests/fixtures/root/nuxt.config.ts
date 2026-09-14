@@ -13,21 +13,23 @@ export default defineNuxtConfig({
     [
       "nuxt-multi-app",
       {
-        root: { id: "root", hosts: ["landing.localhost"] },
+        root: { id: "root" },
         apps: [
           {
             id: "web",
             rootDir: "../web",
-            paths: ["/api/owner/"],
-            hosts: ["*.tenant.localhost"],
             overrides: {
               plugins: [fileURLToPath(new URL("./root-plugin.ts", import.meta.url))],
             },
           },
         ],
-        fallback: false,
+        routing: [
+          { paths: ["/api/owner/"], app: "web" },
+          { resolver: "./resolver.ts" },
+          { hosts: ["landing.localhost"], app: "root" },
+          { hosts: ["*.tenant.localhost"], app: "web" },
+        ],
         readinessPath: "/__nuxt_multi_app/ready",
-        resolver: "./resolver.ts",
         stateHandler: "./state-handler.ts",
         shutdownTimeout: 1_000,
       },

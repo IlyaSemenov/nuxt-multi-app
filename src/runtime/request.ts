@@ -1,8 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
 
-/** Return only the path used by package control endpoints. */
+/** Return the raw pathname without decoding or normalizing request segments. */
 export function requestPath(request: IncomingMessage) {
-  return new URL(request.url ?? "/", "http://nuxt-multi-app.local").pathname
+  const target = request.url ?? "/"
+  const query = target.indexOf("?")
+  return query === -1 ? target : target.slice(0, query)
 }
 
 /** Answer the readiness endpoint from the lifecycle state of every application. */

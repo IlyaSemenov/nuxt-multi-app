@@ -1,70 +1,97 @@
 import { describe, expect, it } from "bun:test"
+import type { IncomingMessage } from "node:http"
 
-import { selectApplication } from "./routing"
+import { selectApplication, type RuntimeRoutingRule } from "./routing"
 
-const apps = [
-  { id: "root", paths: [], hosts: ["example.test"] },
-  { id: "web", paths: [], hosts: ["*.tenant.test"] },
-]
+const apps = [{ id: "root" }, { id: "web" }, { id: "admin" }]
 
-function request(host: string, path = "/") {
-  return { headers: { host }, url: path } as import("node:http").IncomingMessage
+function request(host: string, url = "/") {
+  return { headers: { host }, url } as IncomingMessage
 }
 
 describe("application routing", () => {
-  it("uses the longest segment-boundary path prefix before the resolver", async () => {
-    const pathApps = [
-      { id: "root", paths: ["/api"], hosts: ["example.test"] },
-      { id: "web", paths: ["/api/admin"], hosts: ["*.tenant.test"] },
+  it("uses the first matching rule", async () => {
+    const routing: RuntimeRoutingRule[] = [
+      { paths: ["/api"], app: "web" },
+      { paths: ["/api/admin"], app: "admin" },
+      { app: "root" },
     ]
+
     expect(
-      (await selectApplication(pathApps, false, () => false, request("unknown.test", "/api")))?.id,
-    ).toBe("root")
-    expect(
-      (
-        await selectApplication(
-          pathApps,
-          false,
-          undefined,
-          request("unknown.test", "/api/admin/users?active=1"),
-        )
-      )?.id,
+      (await selectApplication(apps, routing, request("example.test", "/api/admin")))?.id,
     ).toBe("web")
-    expect(
-      await selectApplication(pathApps, false, undefined, request("unknown.test", "/apix")),
-    ).toBeUndefined()
   })
 
-  it("routes by static hosts without a resolver", async () => {
-    expect((await selectApplication(apps, false, undefined, request("example.test")))?.id).toBe(
-      "root",
-    )
-  })
+  it("uses OR within guards and AND across host and path guards", async () => {
+    const routing: RuntimeRoutingRule[] = [
+      {
+        hosts: ["example.test", "*.tenant.test"],
+        paths: ["/api", "/_e2e"],
+        app: "web",
+      },
+      { app: "root" },
+    ]
 
-  it("uses resolver, hosts, fallback, and unmatched in order", async () => {
-    const resolver = (_host: string, req: import("node:http").IncomingMessage) =>
-      req.url?.startsWith("/api/") ? "web" : undefined
-    expect(
-      (await selectApplication(apps, "root", resolver, request("example.test", "/api/rpc")))?.id,
-    ).toBe("web")
-    expect((await selectApplication(apps, "web", resolver, request("example.test")))?.id).toBe(
-      "root",
-    )
-    expect((await selectApplication(apps, false, resolver, request("foo.tenant.test")))?.id).toBe(
+    expect((await selectApplication(apps, routing, request("foo.tenant.test", "/_e2e")))?.id).toBe(
       "web",
     )
-    expect(await selectApplication(apps, false, resolver, request("unknown.test"))).toBeUndefined()
+    expect((await selectApplication(apps, routing, request("example.test", "/page")))?.id).toBe(
+      "root",
+    )
+    expect((await selectApplication(apps, routing, request("other.test", "/api")))?.id).toBe("root")
   })
 
-  it("does not fall through when a resolver returns an unknown ID", async () => {
-    await expect(
-      selectApplication(apps, "web", () => "missing", request("example.test")),
-    ).rejects.toThrow("unknown application")
-  })
+  it("matches path prefixes only at a segment boundary using the raw pathname", async () => {
+    const routing: RuntimeRoutingRule[] = [{ paths: ["/api"], app: "web" }]
 
-  it("lets the resolver explicitly reject a request without using hosts or fallback", async () => {
+    expect((await selectApplication(apps, routing, request("example.test", "/api")))?.id).toBe(
+      "web",
+    )
     expect(
-      await selectApplication(apps, "web", () => false, request("example.test")),
+      (await selectApplication(apps, routing, request("example.test", "/api/users?next=/other")))
+        ?.id,
+    ).toBe("web")
+    expect(
+      await selectApplication(apps, routing, request("example.test", "/apiary")),
     ).toBeUndefined()
+    expect(
+      await selectApplication(apps, routing, request("example.test", "/other/../api")),
+    ).toBeUndefined()
+    expect(
+      await selectApplication(apps, routing, request("example.test", "/%61pi")),
+    ).toBeUndefined()
+  })
+
+  it("guards a resolver and continues when the guard or resolver does not select an app", async () => {
+    let calls = 0
+    const routing: RuntimeRoutingRule[] = [
+      {
+        hosts: ["*.tenant.test"],
+        resolver: () => {
+          calls++
+          return undefined
+        },
+      },
+      { hosts: ["example.test", "*.tenant.test"], app: "root" },
+    ]
+
+    expect((await selectApplication(apps, routing, request("example.test")))?.id).toBe("root")
+    expect(calls).toBe(0)
+    expect((await selectApplication(apps, routing, request("foo.tenant.test")))?.id).toBe("root")
+    expect(calls).toBe(1)
+  })
+
+  it("stops as unmatched when a resolver returns false", async () => {
+    const routing: RuntimeRoutingRule[] = [{ resolver: () => false }, { app: "root" }]
+
+    expect(await selectApplication(apps, routing, request("example.test"))).toBeUndefined()
+  })
+
+  it("rejects an unknown resolver result", async () => {
+    const routing: RuntimeRoutingRule[] = [{ resolver: () => "missing" as never }]
+
+    await expect(selectApplication(apps, routing, request("example.test"))).rejects.toThrow(
+      "unknown application",
+    )
   })
 })

@@ -17,11 +17,20 @@ declare module "nuxt-multi-app/runtime" {
 }
 
 const options = {
-  root: { id: "root", paths: ["/internal"], hosts: ["example.test"] },
-  apps: [{ id: "web", rootDir: "../web", paths: ["/api"], hosts: ["*.tenant.test"] }],
-  fallback: "web",
-  resolver: "./resolver.ts",
+  root: { id: "root" },
+  apps: [{ id: "web", rootDir: "../web" }],
+  routing: [
+    { paths: ["/api"], app: "web" },
+    { hosts: ["*.tenant.test"], resolver: "./resolver.ts" },
+    { app: "root" },
+  ],
   readinessPath: "/ready",
+} satisfies ModuleOptions
+void options
+
+const invalidRule = {
+  // @ts-expect-error a routing rule cannot select an app and invoke a resolver.
+  routing: [{ app: "root", resolver: "./resolver.ts" }],
 } satisfies ModuleOptions
 
 declare const context: NuxtMultiAppRequestContext
@@ -40,6 +49,7 @@ const invalidResolver: MultiAppResolver = () => "website"
 void appId
 void response
 void invalidResolver
+void invalidRule
 void (undefined as unknown as MultiAppState)
 
 const overrides: AppOverrides = { ssr: false }
