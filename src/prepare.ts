@@ -1,12 +1,25 @@
+import { mkdir, writeFile } from "node:fs/promises"
+import { isAbsolute, relative, resolve, sep } from "node:path"
+
 import { buildNuxt, loadNuxt, writeTypes } from "@nuxt/kit"
+import type { Nuxt } from "nuxt/schema"
 
 import { withGlobalNuxtContext } from "./compat"
 import { configureNuxtApp } from "./configure-app"
 import type { NormalizedModuleOptions } from "./options"
 import { childOverrides } from "./overrides"
 
-/** Generate declarations for every child using its mounted configuration profile. */
-export async function prepareChildren(options: NormalizedModuleOptions) {
+const TYPESCRIPT_PROJECTS = ["app", "server", "shared", "node"] as const
+
+/** Register the composition solution and generate every child's mounted declarations. */
+export async function prepareComposition(options: NormalizedModuleOptions, root: Nuxt) {
+  root.hook("prepare:types", async () => {
+    await mkdir(options.root.buildDir, { recursive: true })
+    await writeFile(
+      resolve(options.root.buildDir, "tsconfig.multi-app.json"),
+      typecheckSolution(options),
+    )
+  })
   const ids = options.allApps.map((app) => app.id)
   for (const app of options.apps) {
     const overrides = childOverrides(app, undefined, true)
@@ -28,4 +41,20 @@ export async function prepareChildren(options: NormalizedModuleOptions) {
       await child.close()
     }
   }
+}
+
+/** Generate a TypeScript solution that checks every Nuxt profile in the composition. */
+function typecheckSolution(options: NormalizedModuleOptions) {
+  const references = options.allApps.flatMap((app) =>
+    TYPESCRIPT_PROJECTS.map((project) => ({
+      path: projectPath(options.root.buildDir, resolve(app.buildDir, `tsconfig.${project}.json`)),
+    })),
+  )
+  return `${JSON.stringify({ files: [], references }, null, 2)}\n`
+}
+
+/** Express a referenced project relative to the generated solution on every platform. */
+function projectPath(from: string, to: string) {
+  const path = relative(from, to).split(sep).join("/")
+  return isAbsolute(path) || path.startsWith(".") ? path : `./${path}`
 }

@@ -21,7 +21,7 @@ import type {
   ProjectModule,
 } from "./options"
 import { MODULE_OUTPUT_DIR, PROJECT_MODULES, resolverProjectModule } from "./options"
-import { prepareChildren } from "./prepare"
+import { prepareComposition } from "./prepare"
 import { loadFactory } from "./runtime/factories"
 import type { RuntimeRoutingRule } from "./runtime/routing"
 import { defaultStateHandler } from "./runtime/state"
@@ -38,7 +38,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
 
   if (nuxt.options._prepare) {
     configureNuxtApp(nuxt, options.root, { ids, projectModules })
-    await prepareChildren(options)
+    await prepareComposition(options, nuxt)
     return
   }
 

@@ -505,6 +505,8 @@ try {
         // typings its own application sources rely on, matching the Node major the tests run on.
         devDependencies: {
           "@types/node": "^24",
+          typescript: "5.9.3",
+          "vue-tsc": "3.3.11",
         },
       },
       null,
@@ -514,10 +516,22 @@ try {
   await run(["bun", "install", "--ignore-scripts"], workspace)
   await run(["bun", "run", "nuxt", "prepare", "web"], workspace)
   await run(["bun", "run", "nuxt", "prepare", "root"], workspace)
-  await run(
-    [resolve(root, "node_modules/.bin/tsc"), "-p", "web/.nuxt-multi-app/web/tsconfig.server.json"],
-    workspace,
+  const typecheckConfig = join(workspace, "root/.nuxt/tsconfig.multi-app.json")
+  const typecheckSolution = JSON.parse(await readFile(typecheckConfig, "utf8"))
+  assert.deepEqual(
+    typecheckSolution.references.map(({ path }: { path: string }) => path),
+    [
+      "./tsconfig.app.json",
+      "./tsconfig.server.json",
+      "./tsconfig.shared.json",
+      "./tsconfig.node.json",
+      "../../web/.nuxt-multi-app/web/tsconfig.app.json",
+      "../../web/.nuxt-multi-app/web/tsconfig.server.json",
+      "../../web/.nuxt-multi-app/web/tsconfig.shared.json",
+      "../../web/.nuxt-multi-app/web/tsconfig.node.json",
+    ],
   )
+  await run(["bun", "run", "vue-tsc", "-b", "--noEmit", typecheckConfig], workspace)
   await assertTypeProfiles()
   await assertProjectModuleTypeProfile()
   await assertResolverStartupFailure(

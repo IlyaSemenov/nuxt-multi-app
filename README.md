@@ -171,8 +171,12 @@ Ignore it in Git:
 **/.nuxt-multi-app/
 ```
 
-If the repository type-checks generated Nuxt projects, add one TypeScript project per mounted child.
-In the quick start it extends `apps/tenant/.nuxt-multi-app/tenant/tsconfig.json`.
+The root also writes `.nuxt/tsconfig.multi-app.json`, a TypeScript solution that references every generated project in the composition.
+Check the root and every mounted child with the Vue-aware TypeScript checker used by your project, such as `vue-tsc`:
+
+```sh
+vue-tsc -b --noEmit apps/landing/.nuxt/tsconfig.multi-app.json
+```
 
 Resolver and state-handler files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
 Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
