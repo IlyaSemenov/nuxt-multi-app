@@ -17,6 +17,7 @@ export type {
   RootOptions,
 } from "./options"
 export type {
+  AppId,
   NuxtMultiAppCreateFetch,
   NuxtMultiAppDispatch,
   NuxtMultiAppDispatchOptions,

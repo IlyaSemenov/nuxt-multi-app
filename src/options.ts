@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 
 import type { NuxtConfig } from "nuxt/schema"
 
+import type { AppId } from "./runtime/types"
+
 export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
 
 /** Configuration for the root Nuxt application that owns the public listener. */
@@ -38,12 +40,12 @@ export type MultiAppState =
 export type MultiAppResolver = (
   host: string,
   request: IncomingMessage,
-) => string | false | undefined | Promise<string | false | undefined>
+) => AppId | false | undefined | Promise<AppId | false | undefined>
 
 /** Values available while a project runtime extension is initialized at server startup. */
 export interface MultiAppStartupContext {
   /** Every application ID accepted by routing and dispatch in configuration order. */
-  appIds: ReadonlySet<string>
+  appIds: ReadonlySet<AppId>
 }
 
 /** A project module factory that initializes one resolver before requests are accepted. */

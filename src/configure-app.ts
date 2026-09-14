@@ -1,4 +1,4 @@
-import { createResolver } from "@nuxt/kit"
+import { addTypeTemplate, createResolver } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
 import type { NitroConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
@@ -21,6 +21,15 @@ interface RuntimeSettings {
 /** Add the runtime context, declarations, and isolation constraints to one Nuxt instance. */
 export function configureNuxtApp(nuxt: Nuxt, app: NormalizedAppOptions, settings: RuntimeSettings) {
   assertSupportedNuxt(nuxt)
+  nuxt.runWithContext(() =>
+    addTypeTemplate(
+      {
+        filename: "types/nuxt-multi-app.d.ts",
+        getContents: () => appIdDeclaration(settings.ids),
+      },
+      { nuxt: true, node: true, nitro: true },
+    ),
+  )
   nuxt.options.nitro.plugins = [...(nuxt.options.nitro.plugins ?? []), runtimePlugin]
   assertIsolatedOutput(nuxt.options.nitro, app.id)
 
@@ -50,6 +59,21 @@ export function configureNuxtApp(nuxt: Nuxt, app: NormalizedAppOptions, settings
       nodeTsConfig.include = [...(nodeTsConfig.include ?? []), ...settings.projectModules]
     }
   })
+}
+
+/** Generate the registry augmentation shared by resolver modules and Nitro server code. */
+function appIdDeclaration(ids: string[]) {
+  return [
+    'import "nuxt-multi-app/runtime"',
+    "",
+    'declare module "nuxt-multi-app/runtime" {',
+    "  interface NuxtMultiAppRegistry {",
+    // Property values carry no data; only their keys form the configured AppId union.
+    ...ids.map((id) => `    ${JSON.stringify(id)}: unknown`),
+    "  }",
+    "}",
+    "export {}",
+  ].join("\n")
 }
 
 /** Configure a Nitro output as an importable handler owned by the common server. */

@@ -164,6 +164,7 @@ If the repository type-checks generated Nuxt projects, add one TypeScript projec
 In the quick start it extends `apps/tenant/.nuxt-multi-app/tenant/tsconfig.json`.
 
 The resolver and state-handler files are added to the root's generated `tsconfig.node.json` for you, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
+Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
 
 Set `multiApp.buildDir` to rename that directory for every child, or `buildDir` on a single `apps` entry to move one child; both are resolved from the child root.
 

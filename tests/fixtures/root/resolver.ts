@@ -10,7 +10,7 @@ export default defineMultiAppResolver(({ appIds }) => {
   if (process.env.NUXT_MULTI_APP_TEST_RESOLVER_FAIL) {
     throw new Error("intentional resolver initialization failure")
   }
-  for (const id of ["root", "web"]) {
+  for (const id of ["root", "web"] as const) {
     if (!appIds.has(id)) throw new Error(`fixture requires application ${id}`)
   }
   const runtimeBase = process.env.NUXT_MULTI_APP_TEST_BASE

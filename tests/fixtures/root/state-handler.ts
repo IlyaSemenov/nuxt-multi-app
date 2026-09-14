@@ -1,7 +1,7 @@
 import { defineMultiAppStateHandler } from "nuxt-multi-app"
 
 export default defineMultiAppStateHandler(({ appIds }) => {
-  for (const id of ["root", "web"]) {
+  for (const id of ["root", "web"] as const) {
     if (!appIds.has(id)) throw new Error(`fixture requires application ${id}`)
   }
 

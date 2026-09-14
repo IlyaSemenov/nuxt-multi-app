@@ -1,4 +1,5 @@
 import type { MultiAppStartupContext } from "../options"
+import type { AppId } from "./types"
 
 /** Default export of a project module: receives the startup context and returns the runtime function. */
 type Factory<T> = (context: MultiAppStartupContext) => T | Promise<T>
@@ -28,7 +29,8 @@ export async function initializeFactory<T extends (...args: never[]) => unknown>
 ): Promise<T> {
   let initialized: T
   try {
-    initialized = await factory({ appIds: new Set(appIds) })
+    // IDs originate from the validated application registry that generated the AppId union.
+    initialized = await factory({ appIds: new Set(appIds as AppId[]) })
   } catch (cause) {
     throw new Error(`nuxt-multi-app: ${name} initialization failed`, { cause })
   }

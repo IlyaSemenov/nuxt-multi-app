@@ -350,6 +350,18 @@ async function assertProjectModuleTypeProfile() {
       [],
     )
   }
+
+  const appIdTypeTest = join(workspace, "root/server/app-ids.type-test.ts")
+  const appIdDiagnostics = diagnosticsFor(
+    appIdTypeTest,
+    join(workspace, "root/.nuxt/tsconfig.server.json"),
+  )
+  assert.deepEqual(
+    appIdDiagnostics.map((diagnostic) =>
+      ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+    ),
+    [],
+  )
 }
 
 async function assertResolverStartupFailure(command: string[], cwd: string) {
