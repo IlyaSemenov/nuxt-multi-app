@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.1.2
+
+### Patch Changes
+
+- faffa6c: Make `@types/node` a peer dependency, and widen supported range.
+
 ## 0.1.1
 
 ### Patch Changes
