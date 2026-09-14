@@ -140,18 +140,6 @@ async function writeProductionServer(
     debug: options.debug,
   }
   await writeFile(resolve(moduleDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
-  await writeFile(
-    resolve(moduleDir, "report.json"),
-    `${JSON.stringify(
-      {
-        entry: PRODUCTION_ENTRY,
-        routing: routingMode(Boolean(options.resolver), apps),
-        apps: apps.map(({ id, hosts, entry }) => ({ id, hosts, entry })),
-      },
-      null,
-      2,
-    )}\n`,
-  )
   await setPreviewCommand(outputDir)
   logger.info(`entry ${entry}`)
 }
@@ -166,13 +154,6 @@ async function setPreviewCommand(outputDir: string) {
   // Nuxt runs this command with the Nitro output directory as its working directory.
   buildInfo.commands.preview = `node ./${PRODUCTION_ENTRY}`
   await writeFile(path, `${JSON.stringify(buildInfo, null, 2)}\n`)
-}
-
-function routingMode(hasResolver: boolean, apps: { hosts: string[] }[]) {
-  const hasHosts = apps.some((app) => app.hosts.length > 0)
-  if (hasResolver && hasHosts) return "resolver-and-hosts"
-  if (hasResolver) return "resolver"
-  return "hosts"
 }
 
 function toRelativeUrl(from: string, to: string) {

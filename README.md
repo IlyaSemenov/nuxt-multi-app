@@ -295,8 +295,7 @@ Everything lands in the root application's `.output`:
 ├── server/index.mjs     # process entry point
 └── nuxt-multi-app/
     ├── apps/<app-id>/   # Nitro bundle and public assets for every application
-    ├── manifest.json    # routing configuration the server reads
-    └── report.json      # what was built and how requests are routed
+    └── manifest.json    # routing configuration the server reads
 ```
 
 The root application uses the same `nuxt-multi-app/apps/<app-id>` layout as its children.

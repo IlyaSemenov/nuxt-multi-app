@@ -502,13 +502,11 @@ try {
   }
   await assertRestartableDev(workspace)
   await run(["bun", "run", "nuxt", "build", "root"], workspace)
-  const report = JSON.parse(
-    await readFile(join(workspace, "root/.output/nuxt-multi-app/report.json"), "utf8"),
+  const manifest = JSON.parse(
+    await readFile(join(workspace, "root/.output/nuxt-multi-app/manifest.json"), "utf8"),
   )
-  assert.equal(report.routing, "resolver-and-hosts")
-  assert.equal(report.entry, "server/index.mjs")
   assert.deepEqual(
-    report.apps.map((app: { id: string; entry: string }) => [app.id, app.entry]),
+    manifest.apps.map((app: { id: string; entry: string }) => [app.id, app.entry]),
     [
       ["root", "../nuxt-multi-app/apps/root/server/index.mjs"],
       ["web", "../nuxt-multi-app/apps/web/server/index.mjs"],
