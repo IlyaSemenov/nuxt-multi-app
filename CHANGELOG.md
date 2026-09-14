@@ -1,5 +1,18 @@
 # nuxt-multi-app
 
+## 0.2.0
+
+### Minor Changes
+
+- 6ba4714: Replace application-level routing fields with an ordered `routing` list whose host and path guards can select an application or invoke a resolver.
+- 93fdf75: Remove the unused startup context argument from resolver and state-handler factories.
+- 1b5c2fa: Write the multiplexer to the standard Nitro server entry, make `nuxt preview` launch it, and store the root Nitro output beside mounted applications.
+- 5cd1982: Generate configured application ID types for resolvers, dispatch, and bound fetch clients during `nuxt prepare`.
+
+### Patch Changes
+
+- 3c5b3a3: Expose runtime environment variables through `import.meta.env` in bundled resolver and state-handler modules.
+
 ## 0.1.2
 
 ### Patch Changes
