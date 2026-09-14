@@ -1,5 +1,15 @@
 # nuxt-multi-app
 
+## 0.3.0
+
+### Minor Changes
+
+- 748d04a: Generate a TypeScript solution that checks every Nuxt project in the composition with one command.
+
+### Patch Changes
+
+- cdd7387: Show configured application IDs as a literal union in TypeScript diagnostics.
+
 ## 0.2.1
 
 ### Patch Changes
