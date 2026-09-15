@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.4.0
+
+### Minor Changes
+
+- f0ee00a: Place child build directories under `.nuxt/multi-app`.
+
 ## 0.3.0
 
 ### Minor Changes
