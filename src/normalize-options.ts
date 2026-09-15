@@ -31,14 +31,14 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
 
   const ids = new Set([rootId])
   const roots = new Set([rootDir])
-  const buildDirs = new Set([resolve(nuxt.options.buildDir)])
-  const defaultBuildDir = options.buildDir ?? MODULE_DEFAULTS.buildDir
+  const rootBuildDir = resolve(nuxt.options.buildDir)
+  const buildDirs = new Set([rootBuildDir])
   const apps = (options.apps ?? MODULE_DEFAULTS.apps).map((app) => {
     assertId(app.id)
     if (ids.has(app.id)) throw new Error(`nuxt-multi-app: duplicate application id ${app.id}`)
     ids.add(app.id)
 
-    const normalized = normalizeApp(app, rootDir, defaultBuildDir)
+    const normalized = normalizeApp(app, rootDir, rootBuildDir)
     if (roots.has(normalized.rootDir)) {
       throw new Error(
         `nuxt-multi-app: application root is mounted more than once: ${normalized.rootDir}`,
@@ -80,11 +80,11 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
   }
 }
 
-/** Resolve one child's directories, following symlinks so duplicate mounts are detected. */
+/** Resolve one child's directories, following root symlinks so duplicate mounts are detected. */
 function normalizeApp(
   app: AppOptions,
   rootDir: string,
-  defaultBuildDir: string,
+  rootBuildDir: string,
 ): NormalizedAppOptions {
   const requestedRoot = resolve(rootDir, app.rootDir)
   if (!existsSync(requestedRoot)) {
@@ -95,9 +95,7 @@ function normalizeApp(
     id: app.id,
     rootDir: appRootDir,
     overrides: app.overrides ?? {},
-    buildDir: app.buildDir
-      ? resolve(appRootDir, app.buildDir)
-      : resolve(appRootDir, defaultBuildDir, app.id),
+    buildDir: resolve(rootBuildDir, "multi-app", app.id),
     isRoot: false,
   }
 }

@@ -163,13 +163,8 @@ Add `overrides` to an `apps` entry to apply configuration only while the child r
 
 `nuxt prepare` writes type files for the root and every child without building bundles.
 
-A mounted child generates into `<child-root>/.nuxt-multi-app/<app-id>`, beside the `.nuxt` directory of its standalone build, so both type setups can exist at once.
-
-Ignore it in Git:
-
-```gitignore
-**/.nuxt-multi-app/
-```
+A mounted child generates into `<root-build-dir>/multi-app/<app-id>`.
+This keeps every composition-specific artifact under the application that owns the composition and leaves the child's standalone `.nuxt` directory independent.
 
 The root also writes `.nuxt/tsconfig.multi-app.json`, a TypeScript solution that references every generated project in the composition.
 Check the root and every mounted child with the Vue-aware TypeScript checker used by your project, such as `vue-tsc`:
@@ -181,7 +176,7 @@ vue-tsc -b --noEmit apps/landing/.nuxt/tsconfig.multi-app.json
 Resolver and state-handler files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
 Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
 
-Set `multiApp.buildDir` to rename that directory for every child, or `buildDir` on a single `apps` entry to move one child; both are resolved from the child root.
+Mounted child builds always use the `multi-app` directory inside the root Nuxt `buildDir`.
 
 ## Calling another application during SSR
 
@@ -324,16 +319,15 @@ On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active respo
 
 ## Module options
 
-| Option            | Description                                                            | Default           |
-| ----------------- | ---------------------------------------------------------------------- | ----------------- |
-| `root`            | ID for the root application.                                           | `{ id: "root" }`  |
-| `apps`            | Child applications to load.                                            | `[]`              |
-| `buildDir`        | Generated directory for mounted children, relative to each child root. | `.nuxt-multi-app` |
-| `routing`         | Non-empty ordered application and resolver rules.                      | —                 |
-| `stateHandler`    | Path to a custom error-response file.                                  | —                 |
-| `readinessPath`   | Path of a readiness endpoint answered before routing.                  | —                 |
-| `shutdownTimeout` | Maximum shutdown wait in milliseconds.                                 | `30000`           |
-| `debug`           | Log request routing and application lifecycle events.                  | Nuxt `debug`      |
+| Option            | Description                                           | Default          |
+| ----------------- | ----------------------------------------------------- | ---------------- |
+| `root`            | ID for the root application.                          | `{ id: "root" }` |
+| `apps`            | Child applications to load.                           | `[]`             |
+| `routing`         | Non-empty ordered application and resolver rules.     | —                |
+| `stateHandler`    | Path to a custom error-response file.                 | —                |
+| `readinessPath`   | Path of a readiness endpoint answered before routing. | —                |
+| `shutdownTimeout` | Maximum shutdown wait in milliseconds.                | `30000`          |
+| `debug`           | Log request routing and application lifecycle events. | Nuxt `debug`     |
 
 `root` accepts only `id` and always refers to the Nuxt application that loads the module.
 

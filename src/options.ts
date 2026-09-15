@@ -20,8 +20,6 @@ export interface AppOptions {
   rootDir: string
   /** Explicit mount-point configuration applied after the child's own configuration. */
   overrides?: AppOverrides
-  /** Generated Nuxt directory, resolved from the child application's root. */
-  buildDir?: string
 }
 
 /** State passed to the optional state-handler module. */
@@ -89,7 +87,6 @@ export function resolverProjectModule(index: number): ProjectModule {
 export const MODULE_DEFAULTS = {
   root: { id: "root" },
   apps: [] as AppOptions[],
-  buildDir: ".nuxt-multi-app",
   shutdownTimeout: 30_000,
 } satisfies Omit<ModuleOptions, "routing">
 
@@ -99,8 +96,6 @@ export interface ModuleOptions {
   root?: RootOptions
   /** Independently configured child applications. */
   apps?: AppOptions[]
-  /** Generated Nuxt directory for mounted children, resolved from each child root. */
-  buildDir?: string
   /** Non-empty ordered first-match routing rules. */
   routing: MultiAppRoutingRule[]
   /** Path to a bundled module whose default export is a `MultiAppStateHandlerFactory`. */

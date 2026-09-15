@@ -38,7 +38,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
 
   if (nuxt.options._prepare) {
     configureNuxtApp(nuxt, options.root, { ids, projectModules })
-    await prepareComposition(options, nuxt)
+    prepareComposition(options, nuxt)
     return
   }
 

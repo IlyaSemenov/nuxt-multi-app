@@ -324,7 +324,7 @@ async function assertTypeProfiles() {
     const standalone = diagnosticsFor(probe, join(workspace, "web/.nuxt/tsconfig.app.json"))
     const mounted = diagnosticsFor(
       probe,
-      join(workspace, "web/.nuxt-multi-app/web/tsconfig.app.json"),
+      join(workspace, "root/.nuxt/multi-app/web/tsconfig.app.json"),
     )
     assert(
       standalone.length > 0,
@@ -525,10 +525,10 @@ try {
       "./tsconfig.server.json",
       "./tsconfig.shared.json",
       "./tsconfig.node.json",
-      "../../web/.nuxt-multi-app/web/tsconfig.app.json",
-      "../../web/.nuxt-multi-app/web/tsconfig.server.json",
-      "../../web/.nuxt-multi-app/web/tsconfig.shared.json",
-      "../../web/.nuxt-multi-app/web/tsconfig.node.json",
+      "./multi-app/web/tsconfig.app.json",
+      "./multi-app/web/tsconfig.server.json",
+      "./multi-app/web/tsconfig.shared.json",
+      "./multi-app/web/tsconfig.node.json",
     ],
   )
   await run(["bun", "run", "vue-tsc", "-b", "--noEmit", typecheckConfig], workspace)

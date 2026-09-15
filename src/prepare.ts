@@ -11,8 +11,8 @@ import { childOverrides } from "./overrides"
 
 const TYPESCRIPT_PROJECTS = ["app", "server", "shared", "node"] as const
 
-/** Register the composition solution and generate every child's mounted declarations. */
-export async function prepareComposition(options: NormalizedModuleOptions, root: Nuxt) {
+/** Register generation of the composition solution and every child's mounted declarations. */
+export function prepareComposition(options: NormalizedModuleOptions, root: Nuxt) {
   root.hook("prepare:types", async () => {
     await mkdir(options.root.buildDir, { recursive: true })
     await writeFile(
@@ -20,6 +20,12 @@ export async function prepareComposition(options: NormalizedModuleOptions, root:
       typecheckSolution(options),
     )
   })
+  // Nuxt CLI clears the root build directory after module setup, so nested child artifacts must
+  // be generated from the build lifecycle that follows that cleanup.
+  root.hook("build:before", () => prepareChildren(options))
+}
+
+async function prepareChildren(options: NormalizedModuleOptions) {
   const ids = options.allApps.map((app) => app.id)
   for (const app of options.apps) {
     const overrides = childOverrides(app, undefined, true)

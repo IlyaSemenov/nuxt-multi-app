@@ -84,3 +84,33 @@ describe("routing options", () => {
     }
   })
 })
+
+describe("application directories", () => {
+  it("places mounted build directories under the composition root", () => {
+    const options = normalizeOptions(
+      {
+        apps: [{ id: "web", rootDir: "../web" }],
+        routing: [{ app: "web" }],
+      },
+      nuxt,
+    )
+
+    expect(options.apps[0]!.buildDir).toBe(resolve(rootDir, ".nuxt/multi-app/web"))
+  })
+
+  it("places the default parent inside a custom root Nuxt build directory", () => {
+    const customBuildDir = resolve(rootDir, ".generated/root")
+    const customNuxt = {
+      options: { ...nuxt.options, buildDir: customBuildDir },
+    } as Nuxt
+    const options = normalizeOptions(
+      {
+        apps: [{ id: "web", rootDir: "../web" }],
+        routing: [{ app: "web" }],
+      },
+      customNuxt,
+    )
+
+    expect(options.apps[0]!.buildDir).toBe(resolve(customBuildDir, "multi-app/web"))
+  })
+})
