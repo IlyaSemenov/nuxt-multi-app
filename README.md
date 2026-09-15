@@ -176,8 +176,6 @@ vue-tsc -b --noEmit apps/landing/.nuxt/tsconfig.multi-app.json
 Resolver and state-handler files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
 Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
 
-Mounted child builds always use the `multi-app` directory inside the root Nuxt `buildDir`.
-
 ## Calling another application during SSR
 
 A page rendered by one application sometimes needs an API route that belongs to another one.
