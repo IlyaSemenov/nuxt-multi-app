@@ -11,7 +11,7 @@ export type UpgradeHandler = (request: IncomingMessage, socket: Duplex, head: Bu
 export interface NitroEvent {
   context: Record<string, unknown>
   node: {
-    req: NodeJS.EventEmitter
+    req: Pick<IncomingMessage, "headers" | "once">
     res: NodeJS.EventEmitter & { writableEnded?: boolean }
   }
 }

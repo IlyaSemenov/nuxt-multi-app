@@ -10,6 +10,8 @@ import type {
   NuxtMultiAppDispatchOptions,
 } from "./types"
 
+type IncomingHeaders = Readonly<Record<string, string | string[] | undefined>>
+
 /** Create a dispatcher for one Nitro development worker. */
 export function createDevDispatch(
   appId: string,
@@ -30,14 +32,40 @@ export function createDevDispatch(
 export function createFetchFactory(
   dispatch: NuxtMultiAppDispatch,
   requestSignal: AbortSignal,
+  incomingHeaders: IncomingHeaders = {},
 ): NuxtMultiAppCreateFetch {
   return (targetId, options) => (input, init) => {
-    const request = new Request(input, init)
+    const request = inheritRequestHeaders(
+      new Request(input, init),
+      incomingHeaders,
+      options?.inheritRequestHeaders,
+    )
     return dispatch(targetId, request, {
       // The normalized request follows either `input.signal` or an overriding `init.signal`.
       signal: mergeSignals(requestSignal, options?.signal, request.signal),
     })
   }
+}
+
+/** Fill absent request headers from the incoming HTTP request without changing Fetch precedence. */
+function inheritRequestHeaders(
+  request: Request,
+  incoming: IncomingHeaders,
+  names: readonly string[] | undefined,
+) {
+  if (!names?.length) return request
+  const headers = new Headers(request.headers)
+  for (const name of names) {
+    // Presence, including an explicit empty value, prevents inheritance.
+    if (headers.has(name)) continue
+    const value = incoming[name.toLowerCase()]
+    if (value === undefined) continue
+    headers.set(
+      name,
+      Array.isArray(value) ? value.join(name.toLowerCase() === "cookie" ? "; " : ", ") : value,
+    )
+  }
+  return new Request(request, { headers })
 }
 
 function mergeSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {

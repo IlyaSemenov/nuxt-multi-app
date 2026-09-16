@@ -12,6 +12,12 @@ export interface NuxtMultiAppDispatchOptions {
   signal?: AbortSignal
 }
 
+/** Options for a `fetch` implementation bound to one application. */
+export interface NuxtMultiAppCreateFetchOptions extends NuxtMultiAppDispatchOptions {
+  /** Incoming request headers to inherit when the final Request does not contain them. */
+  inheritRequestHeaders?: readonly string[]
+}
+
 /** Dispatch an HTTP request to a known Nuxt application in the current composition. */
 export type NuxtMultiAppDispatch = (
   appId: AppId,
@@ -25,7 +31,7 @@ export type NuxtMultiAppFetch = (input: RequestInfo | URL, init?: RequestInit) =
 /** Bind `fetch` to an application for clients that take a `fetch` implementation. */
 export type NuxtMultiAppCreateFetch = (
   appId: AppId,
-  options?: NuxtMultiAppDispatchOptions,
+  options?: NuxtMultiAppCreateFetchOptions,
 ) => NuxtMultiAppFetch
 
 /** Per-request multi-application handle injected into every Nitro event. */

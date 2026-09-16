@@ -92,6 +92,17 @@ test("isolates mounted applications and exercises their browser runtime", async 
       body: "payload",
     })
 
+    const inherited = await context.request.post(`${origins[0]}/api/create-fetch`, {
+      headers: { cookie: "session=inherited", "content-type": "text/plain" },
+      data: "inherited payload",
+    })
+    expect(await inherited.json()).toMatchObject({
+      app: "web",
+      host: `landing.localhost:${port}`,
+      cookie: "session=inherited",
+      body: "inherited payload",
+    })
+
     const cancelledRequest = pages[0]!.waitForEvent("requestfailed", {
       predicate: (request) => request.url() === `${origins[0]}/api/dispatch/slow`,
     })

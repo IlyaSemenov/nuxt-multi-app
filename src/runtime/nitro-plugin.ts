@@ -35,7 +35,7 @@ export default defineNitroPlugin((nitroValue) => {
       appId,
       signal,
       dispatch,
-      createFetch: createFetchFactory(dispatch, signal),
+      createFetch: createFetchFactory(dispatch, signal, event.node.req.headers),
     } satisfies NuxtMultiAppRequestContext
   })
 })

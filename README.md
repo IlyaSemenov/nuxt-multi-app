@@ -217,6 +217,18 @@ const response = await fetch(new URL("/api/rpc/posts", getRequestURL(event)), { 
 
 Everything above still applies, and the call aborts with the incoming request; a `signal` on `createFetch()` or on the call itself narrows that.
 
+Use `inheritRequestHeaders` to copy selected headers from the incoming HTTP request when the fetch call does not provide them:
+
+```ts
+const fetch = event.context.nuxtMultiApp.createFetch("tenant", {
+  inheritRequestHeaders: ["cookie", "host"],
+})
+```
+
+The allowlist is empty by default, including for sensitive headers such as `authorization` and `x-forwarded-*`.
+The final `Request` follows the standard Fetch API precedence for `Request` and `RequestInit`, and an explicitly present header, including an empty value, prevents inheritance.
+The application ID still selects the target; an inherited Host header is request data available to that application's middleware and routes.
+
 In development the call crosses a private local socket; in production it reaches the target's Nitro handler inside the same process.
 
 Both live on the server event, so neither reaches the browser.

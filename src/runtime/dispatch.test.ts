@@ -80,4 +80,46 @@ describe("bound fetch", () => {
 
     expect(signal?.aborted).toBe(true)
   })
+
+  it("inherits only absent allowlisted headers from the incoming request", async () => {
+    let dispatched: Request | undefined
+    const dispatch: NuxtMultiAppDispatch = async (_targetId, request) => {
+      dispatched = request
+      return new Response("ok")
+    }
+    const fetch = createFetchFactory(dispatch, new AbortController().signal, {
+      authorization: "Bearer secret",
+      cookie: ["session=root", "tenant=acme"],
+      host: "landing.example",
+    })("tenant", { inheritRequestHeaders: ["cookie", "host"] })
+
+    await fetch("http://internal/api/rpc/posts", { headers: { host: "" } })
+
+    expect(dispatched?.headers.get("cookie")).toBe("session=root; tenant=acme")
+    expect(dispatched?.headers.get("host")).toBe("")
+    expect(dispatched?.headers.has("authorization")).toBe(false)
+  })
+
+  it("applies native RequestInit header replacement before inheritance", async () => {
+    let dispatched: Request | undefined
+    const dispatch: NuxtMultiAppDispatch = async (_targetId, request) => {
+      dispatched = request
+      return new Response("ok")
+    }
+    const fetch = createFetchFactory(dispatch, new AbortController().signal, {
+      cookie: "session=inherited",
+      host: "landing.example",
+    })("tenant", { inheritRequestHeaders: ["cookie", "host"] })
+    const input = new Request("http://internal/api/rpc/posts", {
+      headers: { cookie: "session=input", host: "input.example", "x-input": "removed" },
+    })
+
+    await fetch(input, { headers: { "x-init": "kept" } })
+
+    expect(Object.fromEntries(dispatched!.headers)).toEqual({
+      cookie: "session=inherited",
+      host: "landing.example",
+      "x-init": "kept",
+    })
+  })
 })
