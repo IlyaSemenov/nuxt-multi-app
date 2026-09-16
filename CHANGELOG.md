@@ -1,5 +1,15 @@
 # nuxt-multi-app
 
+## 0.5.0
+
+### Minor Changes
+
+- 6551c0b: Allow `createFetch` to inherit explicitly selected headers from the incoming request.
+
+### Patch Changes
+
+- 56795d0: Propagate the signal from a `Request` passed to `createFetch`.
+
 ## 0.4.0
 
 ### Minor Changes
