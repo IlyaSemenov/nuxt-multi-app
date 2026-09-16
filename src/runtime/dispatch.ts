@@ -31,10 +31,13 @@ export function createFetchFactory(
   dispatch: NuxtMultiAppDispatch,
   requestSignal: AbortSignal,
 ): NuxtMultiAppCreateFetch {
-  return (targetId, options) => (input, init) =>
-    dispatch(targetId, new Request(input, init), {
-      signal: mergeSignals(requestSignal, options?.signal, init?.signal ?? undefined),
+  return (targetId, options) => (input, init) => {
+    const request = new Request(input, init)
+    return dispatch(targetId, request, {
+      // The normalized request follows either `input.signal` or an overriding `init.signal`.
+      signal: mergeSignals(requestSignal, options?.signal, request.signal),
     })
+  }
 }
 
 function mergeSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {

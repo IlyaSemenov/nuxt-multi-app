@@ -46,7 +46,7 @@ describe("dispatch addressing", () => {
 })
 
 describe("bound fetch", () => {
-  it("dispatches to the bound application and keeps the request signal", async () => {
+  it("dispatches to the bound application and keeps the incoming event signal", async () => {
     const calls: { targetId: string; path: string; aborted: boolean }[] = []
     const dispatch: NuxtMultiAppDispatch = async (targetId, request, options) => {
       calls.push({
@@ -64,5 +64,20 @@ describe("bound fetch", () => {
 
     expect(await response.text()).toBe("ok")
     expect(calls).toEqual([{ targetId: "tenant", path: "/api/rpc/posts?batch=1", aborted: true }])
+  })
+
+  it("propagates the signal from a Request input", async () => {
+    let signal: AbortSignal | undefined
+    const dispatch: NuxtMultiAppDispatch = async (_targetId, _request, options) => {
+      signal = options?.signal
+      return new Response("ok")
+    }
+    const inputController = new AbortController()
+    const fetch = createFetchFactory(dispatch, new AbortController().signal)("tenant")
+
+    await fetch(new Request("http://internal/api/rpc/posts", { signal: inputController.signal }))
+    inputController.abort()
+
+    expect(signal?.aborted).toBe(true)
   })
 })
