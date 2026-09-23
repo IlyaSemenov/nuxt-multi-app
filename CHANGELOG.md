@@ -1,5 +1,18 @@
 # nuxt-multi-app
 
+## 0.6.0
+
+### Minor Changes
+
+- 49b4175: Move application outputs to `.output/apps/<app-id>` and mounted child build directories to `<root-build-dir>/multi-app/apps/<app-id>`.
+- 39031d3: Rename `stateHandler` to `fallback`, including related exports.
+
+### Patch Changes
+
+- 8369e4c: Export `NuxtMultiAppCreateFetchOptions` from the package root alongside the other request-context types.
+- 2ff0d9a: End in-flight development dispatches to the root application when its Nitro worker reloads.
+- 832e499: Publish runtime type declarations that no longer reference unpublished source modules.
+
 ## 0.5.0
 
 ### Minor Changes
