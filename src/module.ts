@@ -2,8 +2,8 @@ import { defineNuxtModule } from "@nuxt/kit"
 
 import type { ModuleOptions } from "./options"
 import { MODULE_DEFAULTS } from "./options"
+import type { MultiAppFallbackFactory } from "./runtime/fallback"
 import type { MultiAppResolverFactory } from "./runtime/routing"
-import type { MultiAppStateHandlerFactory } from "./runtime/state"
 import { setupModule } from "./setup"
 
 export type {
@@ -15,10 +15,10 @@ export type {
 } from "./options"
 export type { MultiAppResolver, MultiAppResolverFactory } from "./runtime/routing"
 export type {
-  MultiAppState,
-  MultiAppStateHandler,
-  MultiAppStateHandlerFactory,
-} from "./runtime/state"
+  MultiAppFallbackReason,
+  MultiAppFallback,
+  MultiAppFallbackFactory,
+} from "./runtime/fallback"
 export type {
   AppId,
   NuxtMultiAppCreateFetch,
@@ -34,10 +34,8 @@ export function defineMultiAppResolver(factory: MultiAppResolverFactory): MultiA
   return factory
 }
 
-/** Define a project state-handler factory with contextual typing. */
-export function defineMultiAppStateHandler(
-  factory: MultiAppStateHandlerFactory,
-): MultiAppStateHandlerFactory {
+/** Define a project fallback factory with contextual typing. */
+export function defineMultiAppFallback(factory: MultiAppFallbackFactory): MultiAppFallbackFactory {
   return factory
 }
 

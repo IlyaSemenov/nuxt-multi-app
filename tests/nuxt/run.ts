@@ -246,7 +246,7 @@ async function checkServer(
       404,
       "No Nuxt application",
     )
-    assert.equal(unmatched.headers.get("x-nuxt-multi-app-test-state"), "unmatched")
+    assert.equal(unmatched.headers.get("x-nuxt-multi-app-test-fallback"), "unmatched")
     await assertWebSocket(port)
     await assertBackpressure(origin)
     if (mode !== "portable") await runBrowser(workspace, port, mode)
@@ -369,7 +369,7 @@ async function assertTypeProfiles() {
 
 async function assertProjectModuleTypeProfile() {
   const config = join(workspace, "root/.nuxt/tsconfig.node.json")
-  for (const name of ["resolver.ts", "state-handler.ts"]) {
+  for (const name of ["resolver.ts", "fallback.ts"]) {
     const diagnostics = diagnosticsFor(join(workspace, "root", name), config)
     assert.deepEqual(
       diagnostics.map((diagnostic) =>
@@ -436,7 +436,7 @@ async function assertStaticProductionRouting(cwd: string) {
   const manifestPath = join(cwd, "output/server/manifest.json")
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
   manifest.routing = manifest.routing.filter((rule: object) => !("resolver" in rule))
-  manifest.stateHandler = null
+  manifest.fallback = null
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
   const port = await unusedPort()
@@ -462,7 +462,7 @@ async function assertStaticProductionRouting(cwd: string) {
       404,
       "No Nuxt application",
     )
-    assert.equal(unmatched.headers.get("x-nuxt-multi-app-test-state"), null)
+    assert.equal(unmatched.headers.get("x-nuxt-multi-app-test-fallback"), null)
   } finally {
     child.kill("SIGTERM")
     assert.equal(await child.exited, 0)

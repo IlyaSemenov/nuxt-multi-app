@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test"
 import type { ServerResponse } from "node:http"
 
 import { initializeFactory } from "./factories"
+import type { MultiAppFallback } from "./fallback"
 import type { MultiAppResolver } from "./routing"
-import type { MultiAppStateHandler } from "./state"
 
 describe("runtime factory initialization", () => {
   it("initializes a resolver once", async () => {
@@ -25,12 +25,12 @@ describe("runtime factory initialization", () => {
     ).rejects.toThrow("resolver initialization failed")
   })
 
-  it("initializes a state handler through the same startup contract", async () => {
-    const handler = await initializeFactory<MultiAppStateHandler>(
+  it("initializes a fallback through the same startup contract", async () => {
+    const handler = await initializeFactory<MultiAppFallback>(
       () => (_state, _request, response) => {
         response.end("custom")
       },
-      "state handler",
+      "fallback",
     )
     let body: string | undefined
     const response = { end: (value: string) => (body = value) } as unknown as ServerResponse

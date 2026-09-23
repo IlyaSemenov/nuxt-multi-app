@@ -32,7 +32,7 @@ export default defineNuxtConfig({
           { hosts: ["*.tenant.localhost"], app: "web" },
         ],
         readinessPath: "/__nuxt_multi_app/ready",
-        stateHandler: "./state-handler.ts",
+        fallback: "./fallback.ts",
         shutdownTimeout: 1_000,
       },
     ],

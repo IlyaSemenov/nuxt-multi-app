@@ -14,7 +14,7 @@ import {
   relativePath,
   resolverFile,
   serverDir,
-  STATE_HANDLER_FILE,
+  FALLBACK_FILE,
 } from "./layout"
 import { logger } from "./logger"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
@@ -135,18 +135,18 @@ async function writeProductionServer(
     return relativePath(entryDir, output)
   })
 
-  let stateHandler: string | null = null
-  if (options.stateHandler) {
-    const output = resolve(entryDir, STATE_HANDLER_FILE)
-    await bundleProjectModule(options.stateHandler, output, nuxt)
-    stateHandler = relativePath(entryDir, output)
+  let fallback: string | null = null
+  if (options.fallback) {
+    const output = resolve(entryDir, FALLBACK_FILE)
+    await bundleProjectModule(options.fallback, output, nuxt)
+    fallback = relativePath(entryDir, output)
   }
 
   const apps = entries.map((app) => ({ ...app, entry: relativePath(entryDir, app.entry) }))
   const manifest: ProductionManifest = {
     apps,
     routing,
-    stateHandler,
+    fallback,
     readinessPath: options.readinessPath,
     shutdownTimeout: options.shutdownTimeout,
     debug: options.debug,

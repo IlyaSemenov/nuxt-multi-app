@@ -12,17 +12,13 @@ import { setupDevAdapter } from "./compat"
 import { configureNuxtApp } from "./configure-app"
 import { installDevRouting, type DevEndpoint } from "./dev-routing"
 import { createGateway } from "./gateway"
-import { moduleBuildDir, resolverFile, serverDir, STATE_HANDLER_FILE } from "./layout"
+import { moduleBuildDir, resolverFile, serverDir, FALLBACK_FILE } from "./layout"
 import { normalizeOptions } from "./normalize-options"
 import type { ModuleOptions, NormalizedModuleOptions } from "./options"
 import { prepareComposition } from "./prepare"
 import { loadFactory } from "./runtime/factories"
+import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "./runtime/fallback"
 import { mapResolvers, resolverLabel, type MultiAppResolver } from "./runtime/routing"
-import {
-  defaultStateHandler,
-  STATE_HANDLER_LABEL,
-  type MultiAppStateHandler,
-} from "./runtime/state"
 
 /** Run the Nuxt module lifecycle for prepare, development, or production build. */
 export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
@@ -30,7 +26,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   const ids = options.allApps.map((app) => app.id)
   const projectModules = [
     ...options.routing.flatMap((rule) => ("resolver" in rule ? [rule.resolver] : [])),
-    ...(options.stateHandler ? [options.stateHandler] : []),
+    ...(options.fallback ? [options.fallback] : []),
   ]
   nuxt.options.watch.push(...projectModules)
 
@@ -79,9 +75,9 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   nuxt.hook("listen", async (server: Server) => {
     publicServer = server
     rootAdapter.attach(server)
-    const [routing, stateHandler] = await loadDevModules(options, nuxt)
+    const [routing, fallback] = await loadDevModules(options, nuxt)
     children = options.apps.map((app) =>
-      createChild(app, nuxt, ids, gateway, stateHandler, options.debug),
+      createChild(app, nuxt, ids, gateway, fallback, options.debug),
     )
     for (const child of children) endpoints.set(child.id, child)
     devRouting = installDevRouting(
@@ -89,7 +85,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
       [rootEndpoint, ...children],
       rootAdapter.upgrade,
       routing,
-      stateHandler,
+      fallback,
       options.readinessPath,
       options.debug,
     )
@@ -127,14 +123,10 @@ async function loadDevModules(options: NormalizedModuleOptions, nuxt: Nuxt) {
   const routing = await mapResolvers(options.routing, (input, index) =>
     load<MultiAppResolver>(input, resolverFile(index), resolverLabel(index)),
   )
-  const stateHandler = options.stateHandler
-    ? await load<MultiAppStateHandler>(
-        options.stateHandler,
-        STATE_HANDLER_FILE,
-        STATE_HANDLER_LABEL,
-      )
-    : defaultStateHandler
-  return [routing, stateHandler] as const
+  const fallback = options.fallback
+    ? await load<MultiAppFallback>(options.fallback, FALLBACK_FILE, FALLBACK_LABEL)
+    : defaultFallback
+  return [routing, fallback] as const
 }
 
 async function startChildren(children: ReturnType<typeof createChild>[], server: Server) {

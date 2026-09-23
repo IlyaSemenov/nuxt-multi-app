@@ -52,7 +52,7 @@ function projectHelpers(): Plugin {
       build.onLoad({ filter: /.*/, namespace: "nuxt-multi-app" }, () => ({
         contents: [
           "export const defineMultiAppResolver = factory => factory",
-          "export const defineMultiAppStateHandler = factory => factory",
+          "export const defineMultiAppFallback = factory => factory",
         ].join("\n"),
         loader: "js",
       }))

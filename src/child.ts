@@ -17,7 +17,7 @@ import { logger } from "./logger"
 import type { NormalizedAppOptions } from "./options"
 import { childOverrides } from "./overrides"
 import type { GatewayAddress } from "./runtime/dispatch"
-import type { MultiAppState, MultiAppStateHandler } from "./runtime/state"
+import type { MultiAppFallbackReason, MultiAppFallback } from "./runtime/fallback"
 
 export type ChildState =
   | { type: "starting" }
@@ -31,7 +31,7 @@ export function createChild(
   root: Nuxt,
   ids: string[],
   gateway: { address: GatewayAddress; token: string; invalidate(id: string): void },
-  stateHandler: MultiAppStateHandler,
+  fallback: MultiAppFallback,
   debug: boolean,
 ) {
   const log = logger.withTag(options.id)
@@ -94,13 +94,13 @@ export function createChild(
     },
     handle: (async (request, response) => {
       if (state.type === "ready" && handler) return handler(request, response)
-      const publicState: MultiAppState =
+      const reason: MultiAppFallbackReason =
         state.type === "failed"
           ? { type: "failed", appId: options.id, error: state.error }
           : state.type === "closing"
             ? { type: "closing", appId: options.id }
             : { type: "starting", appId: options.id }
-      return stateHandler(publicState, request, response)
+      return fallback(reason, request, response)
     }) satisfies RequestListener,
     async upgrade(request: Parameters<RequestListener>[0], socket: Duplex, head: Buffer) {
       if (state.type !== "ready") {

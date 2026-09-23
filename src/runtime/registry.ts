@@ -43,7 +43,7 @@ export const MANIFEST_FILE = "manifest.json"
 export interface ProductionManifest {
   apps: { id: string; entry: string }[]
   routing: RoutingRule<string>[]
-  stateHandler: string | null
+  fallback: string | null
   readinessPath?: string
   shutdownTimeout: number
   debug: boolean

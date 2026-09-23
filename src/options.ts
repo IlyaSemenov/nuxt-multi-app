@@ -40,8 +40,8 @@ export interface ModuleOptions {
   apps?: AppOptions[]
   /** Non-empty ordered first-match routing rules. */
   routing: MultiAppRoutingRule[]
-  /** Path to a bundled module whose default export is a `MultiAppStateHandlerFactory`. */
-  stateHandler?: string
+  /** Path to a bundled module whose default export is a `MultiAppFallbackFactory`. */
+  fallback?: string
   /** HTTP path that reports whether every Nuxt application is ready. */
   readinessPath?: string
   /** Maximum graceful-shutdown wait in milliseconds. */
@@ -68,7 +68,7 @@ export interface NormalizedModuleOptions {
   apps: NormalizedAppOptions[]
   allApps: NormalizedAppOptions[]
   routing: NormalizedRoutingRule[]
-  stateHandler?: string
+  fallback?: string
   readinessPath: string | undefined
   shutdownTimeout: number
   debug: boolean

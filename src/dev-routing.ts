@@ -5,9 +5,9 @@ import type { Duplex } from "node:stream"
 import type { ChildState } from "./child"
 import { logger } from "./logger"
 import type { NormalizedAppOptions } from "./options"
+import type { MultiAppFallback } from "./runtime/fallback"
 import { requestPath, sendReadiness } from "./runtime/request"
 import { normalizeHost, selectApplication, type RuntimeRoutingRule } from "./runtime/routing"
-import type { MultiAppStateHandler } from "./runtime/state"
 
 type UpgradeListener = (request: IncomingMessage, socket: Duplex, head: Buffer) => void
 
@@ -24,7 +24,7 @@ export function installDevRouting(
   endpoints: DevEndpoint[],
   rootHmr: UpgradeListener,
   routing: RuntimeRoutingRule[],
-  stateHandler: MultiAppStateHandler,
+  fallback: MultiAppFallback,
   readinessPath: string | undefined,
   debug: boolean,
 ) {
@@ -73,13 +73,13 @@ export function installDevRouting(
         if (endpoint) {
           return endpoint.handle(request, response)
         }
-        return stateHandler(
+        return fallback(
           { type: "unmatched", host: normalizeHost(request.headers.host) },
           request,
           response,
         )
       })
-      .catch((error) => stateHandler({ type: "resolver-error", error }, request, response))
+      .catch((error) => fallback({ type: "resolver-error", error }, request, response))
       .catch((error) => failResponse(response, error))
   }
 
@@ -109,7 +109,7 @@ export function installDevRouting(
 }
 
 function failResponse(response: ServerResponse, error: unknown) {
-  logger.error("state handler failed", error)
+  logger.error("fallback failed", error)
   if (response.headersSent) response.destroy(error as Error)
   else {
     response.statusCode = 500

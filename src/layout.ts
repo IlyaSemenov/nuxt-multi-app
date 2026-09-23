@@ -29,8 +29,8 @@ export function serverDir(baseDir: string) {
   return resolve(baseDir, SERVER_DIR)
 }
 
-/** Bundled state-handler module inside `serverDir()`. */
-export const STATE_HANDLER_FILE = "state-handler.mjs"
+/** Bundled fallback module inside `serverDir()`. */
+export const FALLBACK_FILE = "fallback.mjs"
 
 /** Bundled resolver module of one routing rule inside `serverDir()`. */
 export function resolverFile(index: number) {

@@ -173,7 +173,7 @@ Check the root and every mounted child with the Vue-aware TypeScript checker use
 vue-tsc -b --noEmit apps/landing/.nuxt/tsconfig.multi-app.json
 ```
 
-Resolver and state-handler files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
+Resolver and fallback files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
 Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
 
 ## Calling another application during SSR
@@ -251,33 +251,34 @@ In production every application loads before the server listens, so a server tha
 
 Set `multiApp.debug` to add a per-application breakdown to the body.
 
-## Error responses
+## Fallback responses
 
+When no application can serve a request, the module answers it with a fallback response.
 When no routing rule selects an application, the built-in response is 404; a resolver failure produces 500.
 Development adds 503 while an application is still booting and 500 after one has failed.
 
-Set `stateHandler` to replace those responses with your own:
+Set `fallback` to replace those responses with your own:
 
 ```ts
-// apps/landing/multi-app-state-handler.ts
-import { defineMultiAppStateHandler } from "nuxt-multi-app"
+// apps/landing/multi-app-fallback.ts
+import { defineMultiAppFallback } from "nuxt-multi-app"
 
-export default defineMultiAppStateHandler(() => (state, _request, response) => {
-  const failed = state.type === "failed" || state.type === "resolver-error"
-  response.statusCode = state.type === "unmatched" ? 404 : failed ? 500 : 503
-  response.end(state.type)
+export default defineMultiAppFallback(() => (reason, _request, response) => {
+  const failed = reason.type === "failed" || reason.type === "resolver-error"
+  response.statusCode = reason.type === "unmatched" ? 404 : failed ? 500 : 503
+  response.end(reason.type)
 })
 ```
 
 ```ts
 multiApp: {
-  stateHandler: "./multi-app-state-handler.ts",
+  fallback: "./multi-app-fallback.ts",
 }
 ```
 
-`defineMultiAppStateHandler()` accepts a factory that runs once during server startup.
+`defineMultiAppFallback()` accepts a factory that runs once during server startup.
 The file and its dependencies are bundled into the production output.
-The state handler returned by the factory answers:
+The fallback returned by the factory receives one of these reasons:
 
 - `unmatched`: no application matched the request;
 - `resolver-error`: the resolver threw;
@@ -334,7 +335,7 @@ On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active respo
 | `root`            | ID for the root application.                          | `{ id: "root" }` |
 | `apps`            | Child applications to load.                           | `[]`             |
 | `routing`         | Non-empty ordered application and resolver rules.     | —                |
-| `stateHandler`    | Path to a custom error-response file.                 | —                |
+| `fallback`        | Path to a custom fallback-response file.              | —                |
 | `readinessPath`   | Path of a readiness endpoint answered before routing. | —                |
 | `shutdownTimeout` | Maximum shutdown wait in milliseconds.                | `30000`          |
 | `debug`           | Log request routing and application lifecycle events. | Nuxt `debug`     |

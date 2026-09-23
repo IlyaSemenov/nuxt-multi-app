@@ -1,11 +1,11 @@
 import {
   defineMultiAppResolver,
-  defineMultiAppStateHandler,
+  defineMultiAppFallback,
   type AppId,
   type AppOverrides,
   type ModuleOptions,
   type MultiAppResolver,
-  type MultiAppState,
+  type MultiAppFallbackReason,
   type NuxtMultiAppCreateFetchOptions,
 } from "nuxt-multi-app"
 import type { NuxtMultiAppRequestContext } from "nuxt-multi-app/runtime"
@@ -54,16 +54,16 @@ void response
 void boundFetch
 void invalidResolver
 void invalidRule
-void (undefined as unknown as MultiAppState)
+void (undefined as unknown as MultiAppFallbackReason)
 
 const overrides: AppOverrides = { ssr: false }
 const createResolver = defineMultiAppResolver(
   () => (host) => (host === "example.test" ? "root" : undefined),
 )
-const createStateHandler = defineMultiAppStateHandler(() => (_state, _request, response) => {
+const createFallback = defineMultiAppFallback(() => (_reason, _request, response) => {
   response.end()
 })
 
 void overrides
 void createResolver
-void createStateHandler
+void createFallback

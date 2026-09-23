@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test"
 import type { ServerResponse } from "node:http"
 
-import { defaultStateHandler, type MultiAppState } from "./state"
+import { defaultFallback, type MultiAppFallbackReason } from "./fallback"
 
-function render(state: MultiAppState) {
+function render(reason: MultiAppFallbackReason) {
   let body: string | undefined
   const headers = new Map<string, string | number | readonly string[]>()
   const response = {
@@ -16,12 +16,12 @@ function render(state: MultiAppState) {
     },
   } as unknown as ServerResponse
 
-  defaultStateHandler(state, {} as never, response)
+  defaultFallback(reason, {} as never, response)
 
   return { status: response.statusCode, headers, body }
 }
 
-describe("default state responses", () => {
+describe("default fallback responses", () => {
   it("renders requests with no matching application", () => {
     expect(render({ type: "unmatched", host: "unknown.test" })).toEqual({
       status: 404,

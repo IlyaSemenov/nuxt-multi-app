@@ -6,6 +6,7 @@ import process from "node:process"
 
 import { assertDispatchTarget, localFetch } from "./dispatch"
 import { loadFactory } from "./factories"
+import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "./fallback"
 import type {
   NitroRuntime,
   ProductionManifest,
@@ -21,7 +22,6 @@ import {
   selectApplication,
   type MultiAppResolver,
 } from "./routing"
-import { defaultStateHandler, STATE_HANDLER_LABEL, type MultiAppStateHandler } from "./state"
 
 interface App {
   id: string
@@ -39,12 +39,12 @@ const ids = manifest.apps.map(({ id }) => id)
 const routing = await mapResolvers(manifest.routing, (resolver, index) =>
   loadFactory<MultiAppResolver>(new URL(resolver, import.meta.url).href, resolverLabel(index)),
 )
-const stateHandler = manifest.stateHandler
-  ? await loadFactory<MultiAppStateHandler>(
-      new URL(manifest.stateHandler, import.meta.url).href,
-      STATE_HANDLER_LABEL,
+const fallback = manifest.fallback
+  ? await loadFactory<MultiAppFallback>(
+      new URL(manifest.fallback, import.meta.url).href,
+      FALLBACK_LABEL,
     )
-  : defaultStateHandler
+  : defaultFallback
 
 const context = new AsyncLocalStorage<App>()
 const globals = globalThis as unknown as Record<string, unknown>
@@ -143,7 +143,7 @@ const server = createServer((request, response) => {
   void choose(request)
     .then((app) => {
       if (!app) {
-        return stateHandler(
+        return fallback(
           { type: "unmatched", host: normalizeHost(request.headers.host) },
           request,
           response,
@@ -154,7 +154,7 @@ const server = createServer((request, response) => {
       }
       return context.run(app, () => app.handler(request, response))
     })
-    .catch((error) => stateHandler({ type: "resolver-error", error }, request, response))
+    .catch((error) => fallback({ type: "resolver-error", error }, request, response))
     .catch((error) => fail(response, error))
 })
 

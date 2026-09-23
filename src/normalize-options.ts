@@ -74,7 +74,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
     apps,
     allApps: [root, ...apps],
     routing,
-    stateHandler: resolveModulePath(options.stateHandler, rootDir),
+    fallback: resolveModulePath(options.fallback, rootDir),
     readinessPath,
     shutdownTimeout,
     debug: options.debug ?? Boolean(nuxt.options.debug),
