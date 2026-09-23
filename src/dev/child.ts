@@ -18,12 +18,7 @@ import type { NormalizedAppOptions } from "../options"
 import type { GatewayAddress } from "../runtime/dispatch"
 import type { MultiAppFallbackReason, MultiAppFallback } from "../runtime/fallback"
 import { setupHmr } from "./hmr"
-
-export type ChildState =
-  | { type: "starting" }
-  | { type: "ready" }
-  | { type: "failed"; error: unknown }
-  | { type: "closing" }
+import type { DevEndpointState } from "./routing"
 
 /** Load and own one child Nuxt lifecycle without inheriting the root configuration. */
 export function createChild(
@@ -41,7 +36,7 @@ export function createChild(
   let appUpgrade: ReturnType<typeof getDevUpgrade>
   let starting: Promise<void> | undefined
   let closing: Promise<void> | undefined
-  let state: ChildState = { type: "starting" }
+  let state: DevEndpointState = { type: "starting" }
 
   async function start(server: Server) {
     nuxt = await loadChildNuxt(
@@ -78,7 +73,6 @@ export function createChild(
 
   return {
     id: options.id,
-    options,
     get state() {
       return state
     },
@@ -125,3 +119,6 @@ export function createChild(
     },
   }
 }
+
+/** A mounted child in development, addressed by the dev router and the dispatch gateway. */
+export type Child = ReturnType<typeof createChild>

@@ -12,10 +12,10 @@ import type { NormalizedModuleOptions } from "../options"
 import { loadFactory } from "../runtime/factories"
 import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "../runtime/fallback"
 import { mapResolvers, resolverLabel, type MultiAppResolver } from "../runtime/routing"
-import { createChild, type ChildState } from "./child"
+import { createChild, type Child } from "./child"
 import { createGateway } from "./gateway"
 import { setupHmr } from "./hmr"
-import { installDevRouting } from "./routing"
+import { installDevRouting, type DevEndpointState } from "./routing"
 
 /** Serve the root and every mounted child behind the Nuxt CLI listener during `nuxt dev`. */
 export async function setupDevelopment(
@@ -38,8 +38,8 @@ export async function setupDevelopment(
   nuxt.hook("nitro:init", (nitro) => {
     nitro.hooks.hook("dev:reload", () => gateway.invalidate(options.root.id))
   })
-  let rootState: ChildState = { type: "starting" }
-  let children: ReturnType<typeof createChild>[] = []
+  let rootState: DevEndpointState = { type: "starting" }
+  let children: Child[] = []
   let publicServer: Server | undefined
   nuxt.hook("listen", async (server: Server) => {
     publicServer = server
@@ -96,7 +96,7 @@ async function loadDevModules(options: NormalizedModuleOptions, nuxt: Nuxt) {
   return [routing, fallback] as const
 }
 
-async function startChildren(children: ReturnType<typeof createChild>[], server: Server) {
+async function startChildren(children: Child[], server: Server) {
   for (const child of children) {
     try {
       await child.start(server)

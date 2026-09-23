@@ -5,12 +5,18 @@ import type { UpgradeHandler } from "../runtime/contract"
 import type { MultiAppFallback } from "../runtime/fallback"
 import { createRouter } from "../runtime/router"
 import type { RuntimeRoutingRule } from "../runtime/routing"
-import type { ChildState } from "./child"
+
+/** Lifecycle state of a development application, reported by readiness and the fallback. */
+export type DevEndpointState =
+  | { type: "starting" }
+  | { type: "ready" }
+  | { type: "failed"; error: unknown }
+  | { type: "closing" }
 
 /** One application as the development router and the dispatch gateway address it. */
 export interface DevEndpoint {
   readonly id: string
-  readonly state: ChildState
+  readonly state: DevEndpointState
   handle: RequestListener
   upgrade: UpgradeHandler
 }
@@ -18,7 +24,7 @@ export interface DevEndpoint {
 /** The root application, whose request handling stays with the listeners Nuxt CLI installed. */
 export interface DevRoot {
   id: string
-  state(): ChildState
+  state(): DevEndpointState
   /** Upgrade listener of the root's Vite HMR transport. */
   hmr: UpgradeHandler
 }
