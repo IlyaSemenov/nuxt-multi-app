@@ -1,4 +1,4 @@
-import type { RequestListener, Server } from "node:http"
+import type { Server } from "node:http"
 import { resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -15,7 +15,7 @@ import { mapResolvers, resolverLabel, type MultiAppResolver } from "../runtime/r
 import { createChild, type ChildState } from "./child"
 import { createGateway } from "./gateway"
 import { setupHmr } from "./hmr"
-import { installDevRouting, type DevEndpoint } from "./routing"
+import { installDevRouting } from "./routing"
 
 /** Serve the root and every mounted child behind the Nuxt CLI listener during `nuxt dev`. */
 export async function setupDevelopment(
@@ -23,8 +23,9 @@ export async function setupDevelopment(
   nuxt: Nuxt,
   { ids, projectModules }: { ids: string[]; projectModules: string[] },
 ) {
-  const endpoints = new Map<string, DevEndpoint>()
-  const gateway = createGateway((id) => endpoints.get(id))
+  let devRouting: ReturnType<typeof installDevRouting> | undefined
+  // Until the public listener exists there is no endpoint to address; the gateway rejects the call.
+  const gateway = createGateway((id) => devRouting?.endpoint(id))
   await gateway.listen()
   configureNuxtApp(nuxt, options.root, {
     ids,
@@ -38,23 +39,8 @@ export async function setupDevelopment(
     nitro.hooks.hook("dev:reload", () => gateway.invalidate(options.root.id))
   })
   let rootState: ChildState = { type: "starting" }
-  const rootEndpoint: DevEndpoint = {
-    id: options.root.id,
-    options: options.root,
-    get state() {
-      return rootState
-    },
-    // installDevRouting replaces this before the public listener can dispatch a request.
-    handle: (() => {
-      throw new Error("nuxt-multi-app: root listener is not installed")
-    }) as RequestListener,
-    upgrade: () => undefined,
-  }
-  endpoints.set(options.root.id, rootEndpoint)
-
   let children: ReturnType<typeof createChild>[] = []
   let publicServer: Server | undefined
-  let devRouting: ReturnType<typeof installDevRouting> | undefined
   nuxt.hook("listen", async (server: Server) => {
     publicServer = server
     rootHmr.attach(server)
@@ -62,16 +48,14 @@ export async function setupDevelopment(
     children = options.apps.map((app) =>
       createChild(app, nuxt, ids, gateway, fallback, options.debug),
     )
-    for (const child of children) endpoints.set(child.id, child)
-    devRouting = installDevRouting(
-      server,
-      [rootEndpoint, ...children],
-      rootHmr.upgrade,
+    devRouting = installDevRouting(server, {
+      root: { id: options.root.id, state: () => rootState, hmr: rootHmr.upgrade },
+      children,
       routing,
       fallback,
-      options.readinessPath,
-      options.debug,
-    )
+      readinessPath: options.readinessPath,
+      debug: options.debug,
+    })
   })
 
   nuxt.hook("ready", () => {
