@@ -1,6 +1,6 @@
 {
   "name": "nuxt-multi-app",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Serve several independent Nuxt applications from one dev server and one production process.",
   "homepage": "https://github.com/IlyaSemenov/nuxt-multi-app#readme",
   "bugs": "https://github.com/IlyaSemenov/nuxt-multi-app/issues",
