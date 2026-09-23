@@ -433,7 +433,7 @@ async function assertResolverStartupFailure(command: string[], cwd: string) {
 }
 
 async function assertStaticProductionRouting(cwd: string) {
-  const manifestPath = join(cwd, "output/server/manifest.json")
+  const manifestPath = join(cwd, "output/server/multi-app.json")
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
   manifest.routing = manifest.routing.filter((rule: object) => !("resolver" in rule))
   manifest.fallback = null
@@ -580,7 +580,7 @@ try {
   await assertRestartableDev(workspace)
   await run(["bun", "run", "nuxt", "build", "root"], workspace)
   const manifest = JSON.parse(
-    await readFile(join(workspace, "root/.output/server/manifest.json"), "utf8"),
+    await readFile(join(workspace, "root/.output/server/multi-app.json"), "utf8"),
   )
   assert.deepEqual(
     manifest.apps.map((app: { id: string; entry: string }) => [app.id, app.entry]),

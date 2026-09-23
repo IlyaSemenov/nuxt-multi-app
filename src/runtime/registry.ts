@@ -37,7 +37,7 @@ export interface ProductionRuntime {
 }
 
 /** Routing manifest the build writes beside the production entry. */
-export const MANIFEST_FILE = "manifest.json"
+export const MANIFEST_FILE = "multi-app.json"
 
 /** Composition that `nuxt build` writes for the production entry; module URLs are relative to it. */
 export interface ProductionManifest {

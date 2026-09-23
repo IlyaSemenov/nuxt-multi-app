@@ -318,7 +318,7 @@ Everything lands in the root application's `.output`:
 ├── apps/<app-id>/       # Nitro bundle and public assets for every application
 └── server/
     ├── index.mjs        # process entry point
-    └── manifest.json    # routing configuration the server reads
+    └── multi-app.json   # applications and routing the server reads
 ```
 
 The root application uses the same `apps/<app-id>` layout as its children.
