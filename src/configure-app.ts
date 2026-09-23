@@ -11,7 +11,8 @@ const resolver = createResolver(import.meta.url)
 const runtimeDir = resolver.resolve("./runtime")
 const runtimePlugin = resolver.resolve("./runtime/nitro-plugin")
 
-interface RuntimeSettings {
+/** Registry IDs and development gateway credentials embedded in one application's Nitro bundle. */
+export interface RuntimeSettings {
   ids: string[]
   gateway?: GatewayAddress
   token?: string

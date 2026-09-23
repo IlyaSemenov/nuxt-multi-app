@@ -1,13 +1,12 @@
 import { copyFile, readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
-import { buildNuxt, createResolver, loadNuxt } from "@nuxt/kit"
+import { createResolver } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
 import type { Nuxt } from "nuxt/schema"
 
 import { bundleForOutput, bundleProjectModule } from "./bundle"
-import { withGlobalNuxtContext } from "./compat"
-import { applyHandlerOutput, configureNuxtApp } from "./configure-app"
+import { applyHandlerOutput } from "./configure-app"
 import {
   appDir,
   PRODUCTION_ENTRY,
@@ -16,9 +15,9 @@ import {
   serverDir,
   FALLBACK_FILE,
 } from "./layout"
+import { buildChildOnce, loadChildNuxt } from "./load-child"
 import { logger } from "./logger"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
-import { childOverrides } from "./overrides"
 import { MANIFEST_FILE, type ProductionManifest } from "./runtime/registry"
 import { mapResolvers } from "./runtime/routing"
 
@@ -69,32 +68,14 @@ interface NitroOutput {
 }
 
 async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: string[]) {
-  const overrides = childOverrides(app)
-  overrides.nitro = {
-    ...overrides.nitro,
-    output: {
-      ...overrides.nitro?.output,
-      dir: appDir(outputDir, app.id),
-    },
-  }
-  const child = await loadNuxt({
-    cwd: app.rootDir,
-    dev: false,
-    ready: false,
-    dotenv: false,
-    overrides,
-  })
-  configureNuxtApp(child, app, { ids })
+  const child = await loadChildNuxt(
+    app,
+    { type: "build", outputDir: appDir(outputDir, app.id) },
+    { ids },
+  )
   applyHandlerOutput(child.options.nitro, app.id)
   const output = captureNitroOutput(child)
-  try {
-    await withGlobalNuxtContext(child, async () => {
-      await child.ready()
-      await buildNuxt(child)
-    })
-  } finally {
-    await child.close()
-  }
+  await buildChildOnce(child)
   return output().entry
 }
 

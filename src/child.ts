@@ -2,7 +2,7 @@ import type { Buffer } from "node:buffer"
 import type { RequestListener, Server } from "node:http"
 import type { Duplex } from "node:stream"
 
-import { buildNuxt, loadNuxt, writeTypes } from "@nuxt/kit"
+import { buildNuxt, writeTypes } from "@nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
 import {
@@ -12,10 +12,9 @@ import {
   watchChildConfig,
   withGlobalNuxtContext,
 } from "./compat"
-import { configureNuxtApp } from "./configure-app"
+import { loadChildNuxt } from "./load-child"
 import { logger } from "./logger"
 import type { NormalizedAppOptions } from "./options"
-import { childOverrides } from "./overrides"
 import type { GatewayAddress } from "./runtime/dispatch"
 import type { MultiAppFallbackReason, MultiAppFallback } from "./runtime/fallback"
 
@@ -44,15 +43,12 @@ export function createChild(
   let state: ChildState = { type: "starting" }
 
   async function start(server: Server) {
-    nuxt = await loadNuxt({
-      cwd: options.rootDir,
-      dev: true,
-      ready: false,
-      dotenv: false,
-      overrides: childOverrides(options, root.options.devServer),
-    })
+    nuxt = await loadChildNuxt(
+      options,
+      { type: "dev", devServer: root.options.devServer },
+      { ids, gateway: gateway.address, token: gateway.token },
+    )
     if (closing) return
-    configureNuxtApp(nuxt, options, { ids, gateway: gateway.address, token: gateway.token })
     nuxt.hook("nitro:init", (nitro) => {
       nitro.hooks.hook("dev:reload", () => gateway.invalidate(options.id))
     })

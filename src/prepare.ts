@@ -1,14 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
-import { buildNuxt, loadNuxt, writeTypes } from "@nuxt/kit"
+import { writeTypes } from "@nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
-import { withGlobalNuxtContext } from "./compat"
-import { configureNuxtApp } from "./configure-app"
 import { relativePath, TYPECHECK_SOLUTION } from "./layout"
+import { buildChildOnce, loadChildNuxt } from "./load-child"
 import type { NormalizedModuleOptions } from "./options"
-import { childOverrides } from "./overrides"
 
 const TYPESCRIPT_PROJECTS = ["app", "server", "shared", "node"] as const
 
@@ -26,24 +24,8 @@ export function prepareComposition(options: NormalizedModuleOptions, root: Nuxt)
 async function prepareChildren(options: NormalizedModuleOptions) {
   const ids = options.allApps.map((app) => app.id)
   for (const app of options.apps) {
-    const overrides = childOverrides(app, undefined, true)
-    const child = await loadNuxt({
-      cwd: app.rootDir,
-      dev: false,
-      ready: false,
-      dotenv: false,
-      overrides,
-    })
-    configureNuxtApp(child, app, { ids })
-    try {
-      await withGlobalNuxtContext(child, async () => {
-        await child.ready()
-        await buildNuxt(child)
-        await child.runWithContext(() => writeTypes(child))
-      })
-    } finally {
-      await child.close()
-    }
+    const child = await loadChildNuxt(app, { type: "prepare" }, { ids })
+    await buildChildOnce(child, () => child.runWithContext(() => writeTypes(child)))
   }
 }
 
