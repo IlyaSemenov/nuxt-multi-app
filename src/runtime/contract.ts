@@ -49,5 +49,18 @@ export interface ProductionManifest {
   debug: boolean
 }
 
-/** Global key under which the production entry publishes its registry to the Nitro plugin. */
-export const runtimeSymbol = Symbol.for("nuxt-multi-app.runtime")
+// Every application bundle carries its own copy of this module, so the registry lives on a
+// process-wide key that each copy resolves to the same symbol.
+const runtimeSymbol = Symbol.for("nuxt-multi-app.runtime")
+const runtimeSlot = globalThis as typeof globalThis & { [runtimeSymbol]?: ProductionRuntime }
+
+/** Return the registry the production entry installed, or nothing outside the production server. */
+export function getProductionRuntime() {
+  return runtimeSlot[runtimeSymbol]
+}
+
+/** Install the production registry for Nitro plugins to find, or remove it with `undefined`. */
+export function setProductionRuntime(runtime: ProductionRuntime | undefined) {
+  if (runtime) runtimeSlot[runtimeSymbol] = runtime
+  else delete runtimeSlot[runtimeSymbol]
+}

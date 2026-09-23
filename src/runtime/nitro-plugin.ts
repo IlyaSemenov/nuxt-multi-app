@@ -1,8 +1,7 @@
 import wsAdapter from "crossws/adapters/node"
 import { defineNitroPlugin } from "nitropack/runtime"
 
-import type { NitroEvent, NitroRuntime, ProductionRuntime } from "./contract"
-import { runtimeSymbol } from "./contract"
+import { getProductionRuntime, type NitroEvent, type NitroRuntime } from "./contract"
 import { createDevDispatch, createFetchFactory } from "./dispatch"
 import type { NuxtMultiAppDispatch, NuxtMultiAppRequestContext } from "./types"
 
@@ -14,9 +13,7 @@ const token = process.env.NUXT_MULTI_APP_GATEWAY_TOKEN ?? ""
 /** Inject the application identity and per-request dispatcher into every Nitro event. */
 export default defineNitroPlugin((nitroValue) => {
   const nitro = nitroValue as unknown as NitroRuntime
-  const production = (globalThis as Record<symbol, unknown>)[runtimeSymbol] as
-    | ProductionRuntime
-    | undefined
+  const production = getProductionRuntime()
   if (production) {
     // Nitro creates `h3App.websocket` only when `experimental.websocket` is enabled.
     const upgrade = nitro.h3App?.websocket

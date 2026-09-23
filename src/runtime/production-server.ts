@@ -8,7 +8,7 @@ import type {
   ProductionRuntime,
   UpgradeHandler,
 } from "./contract"
-import { runtimeSymbol } from "./contract"
+import { setProductionRuntime } from "./contract"
 import { assertDispatchTarget, localFetch } from "./dispatch"
 import { loadFactory } from "./factories"
 import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "./fallback"
@@ -101,7 +101,7 @@ export async function createProductionServer(
       }
     },
   }
-  ;(globalThis as Record<symbol, unknown>)[runtimeSymbol] = runtime
+  setProductionRuntime(runtime)
 
   for (const definition of manifest.apps) {
     const module = (await import(new URL(definition.entry, baseUrl).href)) as {
@@ -194,7 +194,7 @@ export async function createProductionServer(
     for (const app of [...apps].reverse()) {
       await context.run(app, () => app.nitro.hooks.callHook("close"))
     }
-    delete (globalThis as Record<symbol, unknown>)[runtimeSymbol]
+    setProductionRuntime(undefined)
   }
 
   return { server, close }

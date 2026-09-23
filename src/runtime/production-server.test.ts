@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { runtimeSymbol, type ProductionManifest, type ProductionRuntime } from "./contract"
+import { getProductionRuntime, type ProductionManifest } from "./contract"
 import { createProductionServer, type ProductionServer } from "./production-server"
 
 /** An application bundle that registers a stub Nitro runtime the way the Nitro plugin does. */
@@ -57,14 +57,16 @@ describe("production server", () => {
   })
 
   it("dispatches between registered applications", async () => {
-    const runtime = (globalThis as Record<symbol, unknown>)[runtimeSymbol] as ProductionRuntime
-    const response = await runtime.dispatch("web", new Request("http://ignored.example/api?q=1"))
+    const response = await getProductionRuntime()!.dispatch(
+      "web",
+      new Request("http://ignored.example/api?q=1"),
+    )
     expect(await response.text()).toBe("web dispatch /api?q=1")
   })
 
   it("closes applications in reverse order and removes the registry", async () => {
     await composition.close()
     expect(closed).toEqual(["web", "root"])
-    expect((globalThis as Record<symbol, unknown>)[runtimeSymbol]).toBeUndefined()
+    expect(getProductionRuntime()).toBeUndefined()
   })
 })
