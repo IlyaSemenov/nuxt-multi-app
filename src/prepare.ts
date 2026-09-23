@@ -5,7 +5,7 @@ import { writeTypes } from "@nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
 import { relativePath, TYPECHECK_SOLUTION } from "./layout"
-import { buildChildOnce, loadChildNuxt } from "./load-child"
+import { buildChildOnce, loadChildNuxt } from "./nuxt/load-child"
 import type { NormalizedModuleOptions } from "./options"
 
 const TYPESCRIPT_PROJECTS = ["app", "server", "shared", "node"] as const

@@ -2,10 +2,9 @@ import type { Buffer } from "node:buffer"
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http"
 import type { Duplex } from "node:stream"
 
+import type { UpgradeHandler } from "./contract"
 import type { MultiAppFallback } from "./fallback"
-import type { UpgradeHandler } from "./registry"
-import { requestPath } from "./request"
-import { normalizeHost, selectApplication, type RuntimeRoutingRule } from "./routing"
+import { normalizeHost, requestPath, selectApplication, type RuntimeRoutingRule } from "./routing"
 
 /** Output channel for routing diagnostics; development and production log differently. */
 export interface RouterLogger {

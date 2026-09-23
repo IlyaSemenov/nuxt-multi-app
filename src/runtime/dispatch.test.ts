@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { createDevDispatch, createFetchFactory } from "./dispatch"
-import { internalPath } from "./request"
+import { createDevDispatch, createFetchFactory, internalPath } from "./dispatch"
 import type { NuxtMultiAppDispatch } from "./types"
 
 describe("dispatch addressing", () => {

@@ -3,9 +3,9 @@ import type {} from "@nuxt/nitro-server"
 import type { NitroConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
 
+import type { NormalizedAppOptions } from "../options"
+import type { GatewayAddress } from "../runtime/dispatch"
 import { assertSupportedNuxt } from "./compat"
-import type { NormalizedAppOptions } from "./options"
-import type { GatewayAddress } from "./runtime/dispatch"
 
 const resolver = createResolver(import.meta.url)
 const runtimeDir = resolver.resolve("./runtime")
@@ -75,21 +75,6 @@ function appIdDeclaration(ids: string[]) {
     "}",
     "export {}",
   ].join("\n")
-}
-
-/** Configure a Nitro output as an importable handler owned by the common server. */
-export function applyHandlerOutput(nitro: NitroConfig, id: string) {
-  const preset = nitro.preset ?? process.env.NITRO_PRESET ?? process.env.SERVER_PRESET
-  if (preset === "node-cluster") {
-    throw new Error(
-      `nuxt-multi-app: ${id} uses node-cluster, which conflicts with the single-process contract`,
-    )
-  }
-  if (preset && !["node", "node-listener", "node-server"].includes(preset)) {
-    throw new Error(`nuxt-multi-app: ${id} uses unsupported Nitro preset ${preset}`)
-  }
-  nitro.preset = "node"
-  nitro.serveStatic = true
 }
 
 function assertIsolatedOutput(nitro: NitroConfig, id: string) {

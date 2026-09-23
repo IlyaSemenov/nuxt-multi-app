@@ -6,8 +6,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import process from "node:process"
 
-import { logger } from "./logger"
-import type { GatewayAddress } from "./runtime/dispatch"
+import { logger } from "../logger"
+import type { GatewayAddress } from "../runtime/dispatch"
 
 export interface GatewayTarget {
   handle: RequestListener

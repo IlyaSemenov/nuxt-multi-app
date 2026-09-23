@@ -3,10 +3,10 @@ import { resolve } from "node:path"
 
 import { createResolver } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
+import type { NitroConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
 
 import { bundleForOutput, bundleProjectModule } from "./bundle"
-import { applyHandlerOutput } from "./configure-app"
 import {
   appDir,
   PRODUCTION_ENTRY,
@@ -15,10 +15,10 @@ import {
   serverDir,
   FALLBACK_FILE,
 } from "./layout"
-import { buildChildOnce, loadChildNuxt } from "./load-child"
 import { logger } from "./logger"
+import { buildChildOnce, loadChildNuxt } from "./nuxt/load-child"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
-import { MANIFEST_FILE, type ProductionManifest } from "./runtime/registry"
+import { MANIFEST_FILE, type ProductionManifest } from "./runtime/contract"
 import { mapResolvers } from "./runtime/routing"
 
 const resolver = createResolver(import.meta.url)
@@ -147,4 +147,19 @@ async function setPreviewCommand(outputDir: string) {
   // Nuxt runs this command with the Nitro output directory as its working directory.
   buildInfo.commands.preview = `node ./${PRODUCTION_ENTRY}`
   await writeFile(path, `${JSON.stringify(buildInfo, null, 2)}\n`)
+}
+
+/** Configure a Nitro output as an importable handler owned by the common server. */
+function applyHandlerOutput(nitro: NitroConfig, id: string) {
+  const preset = nitro.preset ?? process.env.NITRO_PRESET ?? process.env.SERVER_PRESET
+  if (preset === "node-cluster") {
+    throw new Error(
+      `nuxt-multi-app: ${id} uses node-cluster, which conflicts with the single-process contract`,
+    )
+  }
+  if (preset && !["node", "node-listener", "node-server"].includes(preset)) {
+    throw new Error(`nuxt-multi-app: ${id} uses unsupported Nitro preset ${preset}`)
+  }
+  nitro.preset = "node"
+  nitro.serveStatic = true
 }

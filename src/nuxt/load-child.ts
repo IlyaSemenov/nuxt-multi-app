@@ -1,9 +1,9 @@
 import { buildNuxt, loadNuxt } from "@nuxt/kit"
 import type { Nuxt, NuxtConfig } from "nuxt/schema"
 
+import type { NormalizedAppOptions } from "../options"
 import { withGlobalNuxtContext } from "./compat"
-import { configureNuxtApp, type RuntimeSettings } from "./configure-app"
-import type { NormalizedAppOptions } from "./options"
+import { configureNuxtApp, type RuntimeSettings } from "./configure"
 
 /** How a mounted child is loaded: served in development, prepared for types, or built for production. */
 export type ChildMode =

@@ -1,6 +1,5 @@
 import type { IncomingMessage } from "node:http"
 
-import { requestPath } from "./request"
 import type { AppId } from "./types"
 
 /** Choose an application, continue with static routing, or force an unmatched response. */
@@ -47,6 +46,13 @@ export async function mapResolvers<From, To>(
     mapped.push({ ...guards, resolver: await map(resolver, index) })
   }
   return mapped
+}
+
+/** Return the raw pathname without decoding or normalizing request segments. */
+export function requestPath(request: IncomingMessage) {
+  const target = request.url ?? "/"
+  const query = target.indexOf("?")
+  return query === -1 ? target : target.slice(0, query)
 }
 
 /** Normalize a Host header for both custom resolution and declarative host matching. */

@@ -29,12 +29,12 @@ Do not catalog files or restate information evident from their names and locatio
 - Run production handlers, internal fetches, and close hooks inside the target application's async-local context.
 - Load a mounted application while it owns the global Kit context, and hand that context back afterwards; load children one at a time so the owner is never shared.
 - Reject build settings that defeat the documented module-instance isolation guarantee.
-- Keep Nuxt, Nitro, and Vite private API adaptations in `src/compat.ts`.
+- Keep Nuxt, Nitro, and Vite private API adaptations in `src/nuxt/compat.ts`.
 - Embed each application's Vite bridge options as literals in its Nitro bundle, including after renaming the bridge's `process` import.
 - Close children through their Nuxt lifecycle and prevent starts or forwarded restarts once their generation begins closing.
 - Register loaded child and layer configuration files with the child's native builder watcher before building.
 - Keep `src/runtime/` free of imports from outside it, including type-only imports; declare contracts it shares with build-time code inside `src/runtime/`.
-- Keep the value imports of `src/runtime/server.ts` and of the runtime files it uses limited to Node built-ins and sibling `src/runtime/` files; `src/build.ts` bundles the built entry with esbuild into portable output.
+- Keep the value imports of `src/runtime/server.ts` and of the runtime files it uses limited to Node built-ins and sibling `src/runtime/` files; `src/production.ts` bundles the built entry with esbuild into portable output.
 
 ## Documentation
 

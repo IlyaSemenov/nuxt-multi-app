@@ -4,9 +4,9 @@ import type { ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { logger } from "../logger"
+import { gatewayFetch } from "../runtime/dispatch"
 import { createGateway } from "./gateway"
-import { logger } from "./logger"
-import { gatewayFetch } from "./runtime/dispatch"
 
 describe("development dispatch gateway", () => {
   it("uses authenticated loopback TCP on Windows", async () => {

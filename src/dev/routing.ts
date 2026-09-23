@@ -1,12 +1,12 @@
 import type { RequestListener, Server } from "node:http"
 
+import { logger } from "../logger"
+import type { NormalizedAppOptions } from "../options"
+import type { UpgradeHandler } from "../runtime/contract"
+import type { MultiAppFallback } from "../runtime/fallback"
+import { createRouter } from "../runtime/router"
+import type { RuntimeRoutingRule } from "../runtime/routing"
 import type { ChildState } from "./child"
-import { logger } from "./logger"
-import type { NormalizedAppOptions } from "./options"
-import type { MultiAppFallback } from "./runtime/fallback"
-import type { UpgradeHandler } from "./runtime/registry"
-import { createRouter } from "./runtime/router"
-import type { RuntimeRoutingRule } from "./runtime/routing"
 
 export interface DevEndpoint {
   readonly id: string

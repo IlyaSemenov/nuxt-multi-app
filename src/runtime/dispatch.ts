@@ -1,8 +1,7 @@
 import { request as nodeRequest } from "node:http"
 import { Readable } from "node:stream"
 
-import type { NitroRuntime } from "./registry"
-import { internalPath } from "./request"
+import type { NitroRuntime } from "./contract"
 import type {
   NuxtMultiAppCreateFetch,
   NuxtMultiAppDispatch,
@@ -92,6 +91,13 @@ export function localFetch(
   })
 }
 
+/** Reject a dispatch target that is not a registry ID of this composition. */
+export function assertDispatchTarget(ids: string[], targetId: string) {
+  if (!ids.includes(targetId)) {
+    throw new Error(`nuxt-multi-app: dispatch target ${targetId} is not registered`)
+  }
+}
+
 /** Forward a dispatch through the private development gateway with streaming backpressure. */
 export function gatewayFetch(
   gateway: GatewayAddress,
@@ -148,9 +154,16 @@ export function gatewayFetch(
   })
 }
 
-/** Reject a dispatch target that is not a registry ID of this composition. */
-export function assertDispatchTarget(ids: string[], targetId: string) {
-  if (!ids.includes(targetId)) {
-    throw new Error(`nuxt-multi-app: dispatch target ${targetId} is not registered`)
+/**
+ * Convert an absolute Web Request URL to the only address accepted by internal dispatch.
+ */
+export function internalPath(request: Request) {
+  const url = new URL(request.url)
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.hash) {
+    throw new TypeError(
+      "nuxt-multi-app: dispatch requires an HTTP Request without credentials or hash",
+    )
   }
+  // Discard the origin so an application base URL can never turn dispatch into public TCP traffic.
+  return `${url.pathname}${url.search}`
 }

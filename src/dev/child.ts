@@ -5,18 +5,18 @@ import type { Duplex } from "node:stream"
 import { buildNuxt, writeTypes } from "@nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
+import { logger } from "../logger"
 import {
   getDevHandler,
   getDevUpgrade,
   setupDevAdapter,
   watchChildConfig,
   withGlobalNuxtContext,
-} from "./compat"
-import { loadChildNuxt } from "./load-child"
-import { logger } from "./logger"
-import type { NormalizedAppOptions } from "./options"
-import type { GatewayAddress } from "./runtime/dispatch"
-import type { MultiAppFallbackReason, MultiAppFallback } from "./runtime/fallback"
+} from "../nuxt/compat"
+import { loadChildNuxt } from "../nuxt/load-child"
+import type { NormalizedAppOptions } from "../options"
+import type { GatewayAddress } from "../runtime/dispatch"
+import type { MultiAppFallbackReason, MultiAppFallback } from "../runtime/fallback"
 
 export type ChildState =
   | { type: "starting" }

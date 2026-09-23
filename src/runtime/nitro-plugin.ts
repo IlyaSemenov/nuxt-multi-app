@@ -1,9 +1,9 @@
 import wsAdapter from "crossws/adapters/node"
 import { defineNitroPlugin } from "nitropack/runtime"
 
+import type { NitroEvent, NitroRuntime, ProductionRuntime } from "./contract"
+import { runtimeSymbol } from "./contract"
 import { createDevDispatch, createFetchFactory } from "./dispatch"
-import type { NitroEvent, NitroRuntime, ProductionRuntime } from "./registry"
-import { runtimeSymbol } from "./registry"
 import type { NuxtMultiAppDispatch, NuxtMultiAppRequestContext } from "./types"
 
 const appId = process.env.NUXT_MULTI_APP_ID!

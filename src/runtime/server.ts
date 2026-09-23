@@ -4,16 +4,16 @@ import type { RequestListener } from "node:http"
 import { createServer } from "node:http"
 import process from "node:process"
 
-import { assertDispatchTarget, localFetch } from "./dispatch"
-import { loadFactory } from "./factories"
-import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "./fallback"
 import type {
   NitroRuntime,
   ProductionManifest,
   ProductionRuntime,
   UpgradeHandler,
-} from "./registry"
-import { MANIFEST_FILE, runtimeSymbol } from "./registry"
+} from "./contract"
+import { MANIFEST_FILE, runtimeSymbol } from "./contract"
+import { assertDispatchTarget, localFetch } from "./dispatch"
+import { loadFactory } from "./factories"
+import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "./fallback"
 import { createRouter } from "./router"
 import { mapResolvers, resolverLabel, type MultiAppResolver } from "./routing"
 
