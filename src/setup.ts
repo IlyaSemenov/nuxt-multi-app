@@ -11,7 +11,7 @@ import { createChild } from "./child"
 import { setupDevAdapter } from "./compat"
 import { configureNuxtApp } from "./configure-app"
 import { installDevRouting, type DevEndpoint } from "./dev-routing"
-import { createGateway, type GatewayTarget } from "./gateway"
+import { createGateway } from "./gateway"
 import { normalizeOptions } from "./normalize-options"
 import type {
   ModuleOptions,
@@ -49,7 +49,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   }
 
   const endpoints = new Map<string, DevEndpoint>()
-  const gateway = createGateway((id) => endpoints.get(id) as GatewayTarget | undefined)
+  const gateway = createGateway((id) => endpoints.get(id))
   await gateway.listen()
   configureNuxtApp(nuxt, options.root, {
     ids,

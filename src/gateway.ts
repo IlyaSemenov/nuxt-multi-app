@@ -11,7 +11,6 @@ import { logger } from "./logger"
 export type GatewayAddress = { socketPath: string } | { host: string; port: number }
 
 export interface GatewayTarget {
-  id: string
   handle: RequestListener
 }
 
@@ -41,22 +40,23 @@ export function createGateway(
     delete request.headers["x-nuxt-multi-app-token"]
     delete request.headers["x-nuxt-multi-app-target"]
     const target = typeof id === "string" ? getTarget(id) : undefined
-    if (!target) {
+    if (typeof id !== "string" || !target) {
       response.statusCode = 500
       response.end("Unknown nuxt-multi-app target")
       return
     }
-    const responses = active.get(target.id) ?? new Set<ServerResponse>()
-    active.set(target.id, responses)
+    // Track calls by the addressed ID, the same key `invalidate()` receives on a worker reload.
+    const responses = active.get(id) ?? new Set<ServerResponse>()
+    active.set(id, responses)
     responses.add(response)
     const release = () => {
       responses.delete(response)
-      if (!responses.size) active.delete(target.id)
+      if (!responses.size) active.delete(id)
     }
     response.once("finish", release)
     response.once("close", release)
     Promise.resolve(target.handle(request, response)).catch((error) => {
-      logger.withTag(target.id).error(error)
+      logger.withTag(id).error(error)
       if (response.headersSent) response.destroy(error as Error)
       else {
         response.statusCode = 500

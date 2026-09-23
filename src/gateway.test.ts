@@ -1,5 +1,6 @@
 import { describe, expect, it, spyOn } from "bun:test"
 import { randomUUID } from "node:crypto"
+import type { ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -13,7 +14,6 @@ describe("development dispatch gateway", () => {
       (id) =>
         id === "web"
           ? {
-              id,
               handle(request, response) {
                 response.setHeader("content-type", "application/json")
                 response.end(JSON.stringify({ path: request.url, host: request.headers.host }))
@@ -34,6 +34,34 @@ describe("development dispatch gateway", () => {
         }),
       )
       expect(await response.json()).toEqual({ path: "/marker?q=1", host: "tenant.example" })
+    } finally {
+      await gateway.close(1_000)
+    }
+  })
+
+  it("ends in-flight calls to an application when its worker is invalidated", async () => {
+    let pending: ServerResponse | undefined
+    const gateway = createGateway((id) =>
+      id === "root"
+        ? {
+            handle(_request, response) {
+              pending = response
+              response.flushHeaders()
+            },
+          }
+        : undefined,
+    )
+    try {
+      const address = await gateway.listen()
+      const response = await gatewayFetch(
+        address,
+        gateway.token,
+        "root",
+        new Request("http://ignored.example/slow"),
+      )
+      gateway.invalidate("root")
+      expect(pending?.destroyed).toBe(true)
+      await expect(response.text()).rejects.toThrow()
     } finally {
       await gateway.close(1_000)
     }
