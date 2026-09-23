@@ -46,7 +46,7 @@ export async function setupDevelopment(
     rootHmr.attach(server)
     const [routing, fallback] = await loadDevModules(options, nuxt)
     children = options.apps.map((app) =>
-      createChild(app, nuxt, ids, gateway, fallback, options.debug),
+      createChild(app, { root: nuxt, ids, gateway, fallback, debug: options.debug }),
     )
     devRouting = installDevRouting(server, {
       root: { id: options.root.id, state: () => rootState, hmr: rootHmr.upgrade },

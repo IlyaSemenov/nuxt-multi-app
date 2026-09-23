@@ -20,14 +20,19 @@ import type { MultiAppFallbackReason, MultiAppFallback } from "../runtime/fallba
 import { setupHmr } from "./hmr"
 import type { DevEndpointState } from "./routing"
 
+/** The root instance and composition-wide services a mounted child is created with. */
+export interface ChildContext {
+  root: Nuxt
+  ids: string[]
+  gateway: { address: GatewayAddress; token: string; invalidate(id: string): void }
+  fallback: MultiAppFallback
+  debug: boolean
+}
+
 /** Load and own one child Nuxt lifecycle without inheriting the root configuration. */
 export function createChild(
   options: NormalizedAppOptions,
-  root: Nuxt,
-  ids: string[],
-  gateway: { address: GatewayAddress; token: string; invalidate(id: string): void },
-  fallback: MultiAppFallback,
-  debug: boolean,
+  { root, ids, gateway, fallback, debug }: ChildContext,
 ) {
   const log = logger.withTag(options.id)
   let nuxt: Nuxt | undefined
