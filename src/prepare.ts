@@ -1,11 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises"
-import { isAbsolute, relative, resolve, sep } from "node:path"
+import { resolve } from "node:path"
 
 import { buildNuxt, loadNuxt, writeTypes } from "@nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
 import { withGlobalNuxtContext } from "./compat"
 import { configureNuxtApp } from "./configure-app"
+import { relativePath } from "./layout"
 import type { NormalizedModuleOptions } from "./options"
 import { childOverrides } from "./overrides"
 
@@ -53,14 +54,8 @@ async function prepareChildren(options: NormalizedModuleOptions) {
 function typecheckSolution(options: NormalizedModuleOptions) {
   const references = options.allApps.flatMap((app) =>
     TYPESCRIPT_PROJECTS.map((project) => ({
-      path: projectPath(options.root.buildDir, resolve(app.buildDir, `tsconfig.${project}.json`)),
+      path: relativePath(options.root.buildDir, resolve(app.buildDir, `tsconfig.${project}.json`)),
     })),
   )
   return `${JSON.stringify({ files: [], references }, null, 2)}\n`
-}
-
-/** Express a referenced project relative to the generated solution on every platform. */
-function projectPath(from: string, to: string) {
-  const path = relative(from, to).split(sep).join("/")
-  return isAbsolute(path) || path.startsWith(".") ? path : `./${path}`
 }

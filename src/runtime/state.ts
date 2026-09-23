@@ -18,6 +18,9 @@ export type MultiAppStateHandler = (
 /** A project module factory that initializes one state handler before requests are accepted. */
 export type MultiAppStateHandlerFactory = () => MultiAppStateHandler | Promise<MultiAppStateHandler>
 
+/** Diagnostic label of the state-handler module. */
+export const STATE_HANDLER_LABEL = "state handler"
+
 /** Render the stable built-in response for a multi-application routing state. */
 export const defaultStateHandler: MultiAppStateHandler = (state, _request, response) => {
   if (state.type === "unmatched") {

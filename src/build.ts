@@ -1,5 +1,5 @@
 import { copyFile, readFile, writeFile } from "node:fs/promises"
-import { dirname, relative, resolve, sep } from "node:path"
+import { dirname, resolve } from "node:path"
 
 import { buildNuxt, createResolver, loadNuxt } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
@@ -8,6 +8,7 @@ import type { Nuxt } from "nuxt/schema"
 import { bundleForOutput, bundleProjectModule } from "./bundle"
 import { withGlobalNuxtContext } from "./compat"
 import { applyHandlerOutput, configureNuxtApp } from "./configure-app"
+import { relativePath } from "./layout"
 import { logger } from "./logger"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
 import {
@@ -17,6 +18,8 @@ import {
   resolverProjectModule,
 } from "./options"
 import { childOverrides } from "./overrides"
+import type { ProductionManifest } from "./runtime/registry"
+import { mapResolvers } from "./runtime/routing"
 
 const resolver = createResolver(import.meta.url)
 const serverEntry = resolver.resolve("./runtime/server.js")
@@ -126,28 +129,21 @@ async function writeProductionServer(
   // The output runs without this package installed, so the entry is bundled from the built runtime.
   await bundleForOutput(serverEntry, entry)
 
-  const routing = []
-  for (const [index, rule] of options.routing.entries()) {
-    if ("app" in rule) {
-      routing.push(rule)
-      continue
-    }
-    const { resolver: input, ...guards } = rule
-    const module = resolverProjectModule(index)
-    const output = resolve(moduleDir, module.file)
+  const routing = await mapResolvers(options.routing, async (input, index) => {
+    const output = resolve(moduleDir, resolverProjectModule(index).file)
     await bundleProjectModule(input, output, nuxt)
-    routing.push({ ...guards, resolver: toRelativeUrl(entryDir, output) })
-  }
+    return relativePath(entryDir, output)
+  })
 
   let stateHandler: string | null = null
   if (options.stateHandler) {
     const output = resolve(moduleDir, PROJECT_MODULES.stateHandler.file)
     await bundleProjectModule(options.stateHandler, output, nuxt)
-    stateHandler = toRelativeUrl(entryDir, output)
+    stateHandler = relativePath(entryDir, output)
   }
 
-  const apps = entries.map((app) => ({ ...app, entry: toRelativeUrl(entryDir, app.entry) }))
-  const manifest = {
+  const apps = entries.map((app) => ({ ...app, entry: relativePath(entryDir, app.entry) }))
+  const manifest: ProductionManifest = {
     apps,
     routing,
     stateHandler,
@@ -170,9 +166,4 @@ async function setPreviewCommand(outputDir: string) {
   // Nuxt runs this command with the Nitro output directory as its working directory.
   buildInfo.commands.preview = `node ./${PRODUCTION_ENTRY}`
   await writeFile(path, `${JSON.stringify(buildInfo, null, 2)}\n`)
-}
-
-function toRelativeUrl(from: string, to: string) {
-  const path = relative(from, to).split(sep).join("/")
-  return path.startsWith(".") ? path : `./${path}`
 }

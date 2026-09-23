@@ -17,7 +17,7 @@ import type { ModuleOptions, NormalizedModuleOptions, ProjectModule } from "./op
 import { MODULE_OUTPUT_DIR, PROJECT_MODULES, resolverProjectModule } from "./options"
 import { prepareComposition } from "./prepare"
 import { loadFactory } from "./runtime/factories"
-import type { MultiAppResolver, RuntimeRoutingRule } from "./runtime/routing"
+import { mapResolvers, type MultiAppResolver } from "./runtime/routing"
 import { defaultStateHandler, type MultiAppStateHandler } from "./runtime/state"
 
 /** Run the Nuxt module lifecycle for prepare, development, or production build. */
@@ -120,18 +120,9 @@ async function loadDevModules(options: NormalizedModuleOptions, nuxt: Nuxt) {
     // The query defeats the ESM cache, so a full Nuxt restart imports the freshly bundled module.
     return loadFactory<T>(`${pathToFileURL(output).href}?t=${Date.now()}`, module.name)
   }
-  const routing: RuntimeRoutingRule[] = []
-  for (const [index, rule] of options.routing.entries()) {
-    if ("app" in rule) {
-      routing.push(rule)
-      continue
-    }
-    const { resolver: input, ...guards } = rule
-    routing.push({
-      ...guards,
-      resolver: await load<MultiAppResolver>(input, resolverProjectModule(index)),
-    })
-  }
+  const routing = await mapResolvers(options.routing, (input, index) =>
+    load<MultiAppResolver>(input, resolverProjectModule(index)),
+  )
   const stateHandler = options.stateHandler
     ? await load<MultiAppStateHandler>(options.stateHandler, PROJECT_MODULES.stateHandler)
     : defaultStateHandler

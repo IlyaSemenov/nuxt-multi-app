@@ -12,10 +12,42 @@ export type MultiAppResolver = (
 /** A project module factory that initializes one resolver before requests are accepted. */
 export type MultiAppResolverFactory = () => MultiAppResolver | Promise<MultiAppResolver>
 
+/** Diagnostic label of the resolver module in one routing rule. */
+export function resolverLabel(index: number) {
+  return `resolver in routing rule ${index + 1}`
+}
+
+/** Host and path guards that must all match before a routing rule applies. */
+export interface RoutingGuards {
+  /** Exact hosts or leading-wildcard host patterns, matched with OR semantics. */
+  hosts?: string[]
+  /** Absolute path prefixes, matched with OR semantics at segment boundaries. */
+  paths?: string[]
+}
+
+/** A validated routing rule whose resolver has the representation `R` of one pipeline stage. */
+export type RoutingRule<R> = RoutingGuards & ({ app: string } | { resolver: R })
+
 /** One executable routing rule after project resolver factories have initialized. */
-export type RuntimeRoutingRule =
-  | { app: string; hosts?: string[]; paths?: string[] }
-  | { resolver: MultiAppResolver; hosts?: string[]; paths?: string[] }
+export type RuntimeRoutingRule = RoutingRule<MultiAppResolver>
+
+/** Replace every resolver through `map`, keeping application rules and all guards unchanged. */
+export async function mapResolvers<From, To>(
+  rules: RoutingRule<From>[],
+  map: (resolver: From, index: number) => Promise<To>,
+): Promise<RoutingRule<To>[]> {
+  const mapped: RoutingRule<To>[] = []
+  // Resolvers are bundled and initialized one at a time, in configuration order.
+  for (const [index, rule] of rules.entries()) {
+    if ("app" in rule) {
+      mapped.push(rule)
+      continue
+    }
+    const { resolver, ...guards } = rule
+    mapped.push({ ...guards, resolver: await map(resolver, index) })
+  }
+  return mapped
+}
 
 /** Normalize a Host header for both custom resolution and declarative host matching. */
 export function normalizeHost(header: string | undefined) {

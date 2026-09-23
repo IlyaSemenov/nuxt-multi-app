@@ -4,31 +4,24 @@ import type { IncomingMessage, RequestListener, ServerResponse } from "node:http
 import { createServer } from "node:http"
 import process from "node:process"
 
-import { localFetch } from "./dispatch"
+import { assertDispatchTarget, localFetch } from "./dispatch"
 import { loadFactory } from "./factories"
-import type { NitroRuntime, ProductionRuntime, UpgradeHandler } from "./registry"
+import type {
+  NitroRuntime,
+  ProductionManifest,
+  ProductionRuntime,
+  UpgradeHandler,
+} from "./registry"
 import { runtimeSymbol } from "./registry"
 import { requestPath, sendReadiness } from "./request"
 import {
+  mapResolvers,
   normalizeHost,
+  resolverLabel,
   selectApplication,
   type MultiAppResolver,
-  type RuntimeRoutingRule,
 } from "./routing"
-import { defaultStateHandler, type MultiAppStateHandler } from "./state"
-
-/** Routing configuration that `nuxt build` writes in the module-owned output directory. */
-interface Manifest {
-  apps: { id: string; entry: string }[]
-  routing: (
-    | { app: string; hosts?: string[]; paths?: string[] }
-    | { resolver: string; hosts?: string[]; paths?: string[] }
-  )[]
-  stateHandler: string | null
-  readinessPath?: string
-  shutdownTimeout: number
-  debug: boolean
-}
+import { defaultStateHandler, STATE_HANDLER_LABEL, type MultiAppStateHandler } from "./state"
 
 interface App {
   id: string
@@ -41,27 +34,15 @@ interface App {
 
 const manifest = JSON.parse(
   await readFile(new URL("../nuxt-multi-app/manifest.json", import.meta.url), "utf8"),
-) as Manifest
+) as ProductionManifest
 const ids = manifest.apps.map(({ id }) => id)
-const routing: RuntimeRoutingRule[] = []
-for (const [index, rule] of manifest.routing.entries()) {
-  if ("app" in rule) {
-    routing.push(rule)
-    continue
-  }
-  const { resolver, ...guards } = rule
-  routing.push({
-    ...guards,
-    resolver: await loadFactory<MultiAppResolver>(
-      new URL(resolver, import.meta.url).href,
-      `resolver in routing rule ${index + 1}`,
-    ),
-  })
-}
+const routing = await mapResolvers(manifest.routing, (resolver, index) =>
+  loadFactory<MultiAppResolver>(new URL(resolver, import.meta.url).href, resolverLabel(index)),
+)
 const stateHandler = manifest.stateHandler
   ? await loadFactory<MultiAppStateHandler>(
       new URL(manifest.stateHandler, import.meta.url).href,
-      "state handler",
+      STATE_HANDLER_LABEL,
     )
   : defaultStateHandler
 
@@ -95,9 +76,7 @@ const runtime: ProductionRuntime = {
     registrations.set(id, { nitro, upgrade })
   },
   async dispatch(targetId, request, options = {}) {
-    if (!ids.includes(targetId)) {
-      throw new Error(`nuxt-multi-app: dispatch target ${targetId} is not registered`)
-    }
+    assertDispatchTarget(ids, targetId)
     const target = appsById.get(targetId)
     if (closing || !target) {
       return new Response(null, { status: 503, headers: { "retry-after": "1" } })

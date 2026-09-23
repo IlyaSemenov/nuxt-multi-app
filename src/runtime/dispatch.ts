@@ -23,7 +23,7 @@ export function createDevDispatch(
   token: string,
 ): NuxtMultiAppDispatch {
   return async (targetId, request, options) => {
-    assertTarget(ids, targetId)
+    assertDispatchTarget(ids, targetId)
     return targetId === appId
       ? localFetch(nitro, request, options)
       : gatewayFetch(gateway, token, targetId, request, options)
@@ -148,7 +148,8 @@ export function gatewayFetch(
   })
 }
 
-function assertTarget(ids: string[], targetId: string) {
+/** Reject a dispatch target that is not a registry ID of this composition. */
+export function assertDispatchTarget(ids: string[], targetId: string) {
   if (!ids.includes(targetId)) {
     throw new Error(`nuxt-multi-app: dispatch target ${targetId} is not registered`)
   }

@@ -1,5 +1,8 @@
 import type { NuxtConfig } from "nuxt/schema"
 
+import { resolverLabel, type RoutingGuards, type RoutingRule } from "./runtime/routing"
+import { STATE_HANDLER_LABEL } from "./runtime/state"
+
 export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
 
 /** Configuration for the root Nuxt application that owns the public listener. */
@@ -18,17 +21,10 @@ export interface AppOptions {
   overrides?: AppOverrides
 }
 
-interface MultiAppRoutingGuards {
-  /** Exact hosts or leading-wildcard host patterns, matched with OR semantics. */
-  hosts?: string[]
-  /** Absolute path prefixes, matched with OR semantics at segment boundaries. */
-  paths?: string[]
-}
-
 /** One ordered routing rule that targets an application or invokes a project resolver. */
 export type MultiAppRoutingRule =
-  | (MultiAppRoutingGuards & { app: string; resolver?: never })
-  | (MultiAppRoutingGuards & { resolver: string; app?: never })
+  | (RoutingGuards & { app: string; resolver?: never })
+  | (RoutingGuards & { resolver: string; app?: never })
 
 /** Directory the module owns inside a Nitro output or Nuxt build directory. */
 export const MODULE_OUTPUT_DIR = "nuxt-multi-app"
@@ -38,7 +34,7 @@ export const PRODUCTION_ENTRY = "server/index.mjs"
 
 /** Project modules bundled into generated output, keyed by their `ModuleOptions` field. */
 export const PROJECT_MODULES = {
-  stateHandler: { file: "state-handler.mjs", name: "state handler" },
+  stateHandler: { file: "state-handler.mjs", name: STATE_HANDLER_LABEL },
 } as const satisfies Record<string, ProjectModule>
 
 /** Generated filename and diagnostic label for one bundled project module. */
@@ -49,7 +45,7 @@ export interface ProjectModule {
 
 /** Describe the generated module for a resolver at one routing-list index. */
 export function resolverProjectModule(index: number): ProjectModule {
-  return { file: `resolver-${index + 1}.mjs`, name: `resolver in routing rule ${index + 1}` }
+  return { file: `resolver-${index + 1}.mjs`, name: resolverLabel(index) }
 }
 
 /** Values applied to every option the project leaves unset. */
@@ -86,22 +82,8 @@ export interface NormalizedAppOptions {
   isRoot: boolean
 }
 
-/** A validated routing rule that selects an application. */
-export interface NormalizedAppRoutingRule {
-  app: string
-  hosts?: string[]
-  paths?: string[]
-}
-
-/** A validated routing rule whose resolver module is stored as an absolute path. */
-export interface NormalizedResolverRoutingRule {
-  resolver: string
-  hosts?: string[]
-  paths?: string[]
-}
-
-/** A validated rule in configuration order. */
-export type NormalizedRoutingRule = NormalizedAppRoutingRule | NormalizedResolverRoutingRule
+/** A validated rule in configuration order, with its resolver module stored as an absolute path. */
+export type NormalizedRoutingRule = RoutingRule<string>
 
 /** Fully validated module configuration. */
 export interface NormalizedModuleOptions {

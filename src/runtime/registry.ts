@@ -2,6 +2,7 @@ import type { Buffer } from "node:buffer"
 import type { IncomingMessage } from "node:http"
 import type { Duplex } from "node:stream"
 
+import type { RoutingRule } from "./routing"
 import type { NuxtMultiAppDispatch } from "./types"
 
 /** Node `upgrade` listener signature shared by Nitro's WebSocket adapter and the production entry. */
@@ -33,6 +34,16 @@ export interface NitroRuntime {
 export interface ProductionRuntime {
   register(appId: string, nitro: NitroRuntime, upgrade?: UpgradeHandler): void
   dispatch: NuxtMultiAppDispatch
+}
+
+/** Composition that `nuxt build` writes for the production entry; module URLs are relative to it. */
+export interface ProductionManifest {
+  apps: { id: string; entry: string }[]
+  routing: RoutingRule<string>[]
+  stateHandler: string | null
+  readinessPath?: string
+  shutdownTimeout: number
+  debug: boolean
 }
 
 /** Global key under which the production entry publishes its registry to the Nitro plugin. */
