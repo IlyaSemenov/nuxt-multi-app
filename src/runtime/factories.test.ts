@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test"
 import type { ServerResponse } from "node:http"
 
-import type { MultiAppResolver, MultiAppStateHandler } from "../options"
 import { initializeFactory } from "./factories"
+import type { MultiAppResolver } from "./routing"
+import type { MultiAppStateHandler } from "./state"
 
 describe("runtime factory initialization", () => {
   it("initializes a resolver once", async () => {

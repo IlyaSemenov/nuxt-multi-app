@@ -1,7 +1,6 @@
 import { request as nodeRequest } from "node:http"
 import { Readable } from "node:stream"
 
-import type { GatewayAddress } from "../gateway"
 import type { NitroRuntime } from "./registry"
 import { internalPath } from "./request"
 import type {
@@ -9,6 +8,9 @@ import type {
   NuxtMultiAppDispatch,
   NuxtMultiAppDispatchOptions,
 } from "./types"
+
+/** Address of the private development gateway, as embedded in each Nitro development bundle. */
+export type GatewayAddress = { socketPath: string } | { host: string; port: number }
 
 type IncomingHeaders = Readonly<Record<string, string | string[] | undefined>>
 

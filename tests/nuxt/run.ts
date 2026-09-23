@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { connect, createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -314,6 +314,34 @@ async function assertIpcStopped(snapshots: { socketPath: string }[]) {
   }
 }
 
+/** Compile every published declaration file, so none can reference an unpublished source module. */
+async function assertPackageDeclarations() {
+  const packageDir = join(workspace, "node_modules/nuxt-multi-app/dist")
+  const files = (await readdir(packageDir, { recursive: true }))
+    .filter((file) => /\.d\.m?ts$/.test(file))
+    .map((file) => join(packageDir, file))
+  const program = ts.createProgram({
+    rootNames: files,
+    options: {
+      noEmit: true,
+      module: ts.ModuleKind.NodeNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeNext,
+      target: ts.ScriptTarget.ESNext,
+      types: ["node"],
+    },
+  })
+  assert.deepEqual(
+    ts
+      .getPreEmitDiagnostics(program)
+      .filter((diagnostic) => diagnostic.file?.fileName.startsWith(packageDir))
+      .map(
+        (diagnostic) =>
+          `${diagnostic.file!.fileName}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")}`,
+      ),
+    [],
+  )
+}
+
 async function assertTypeProfiles() {
   const probe = join(workspace, "web/app/type-profile-probe.ts")
   await writeFile(
@@ -532,6 +560,7 @@ try {
     ],
   )
   await run(["bun", "run", "vue-tsc", "-b", "--noEmit", typecheckConfig], workspace)
+  await assertPackageDeclarations()
   await assertTypeProfiles()
   await assertProjectModuleTypeProfile()
   await assertResolverStartupFailure(

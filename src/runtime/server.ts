@@ -4,14 +4,18 @@ import type { IncomingMessage, RequestListener, ServerResponse } from "node:http
 import { createServer } from "node:http"
 import process from "node:process"
 
-import type { MultiAppResolver, MultiAppStateHandler } from "../options"
 import { localFetch } from "./dispatch"
 import { loadFactory } from "./factories"
 import type { NitroRuntime, ProductionRuntime, UpgradeHandler } from "./registry"
 import { runtimeSymbol } from "./registry"
 import { requestPath, sendReadiness } from "./request"
-import { normalizeHost, selectApplication, type RuntimeRoutingRule } from "./routing"
-import { defaultStateHandler } from "./state"
+import {
+  normalizeHost,
+  selectApplication,
+  type MultiAppResolver,
+  type RuntimeRoutingRule,
+} from "./routing"
+import { defaultStateHandler, type MultiAppStateHandler } from "./state"
 
 /** Routing configuration that `nuxt build` writes in the module-owned output directory. */
 interface Manifest {

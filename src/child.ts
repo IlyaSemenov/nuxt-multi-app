@@ -13,10 +13,11 @@ import {
   withGlobalNuxtContext,
 } from "./compat"
 import { configureNuxtApp } from "./configure-app"
-import type { GatewayAddress } from "./gateway"
 import { logger } from "./logger"
-import type { MultiAppState, MultiAppStateHandler, NormalizedAppOptions } from "./options"
+import type { NormalizedAppOptions } from "./options"
 import { childOverrides } from "./overrides"
+import type { GatewayAddress } from "./runtime/dispatch"
+import type { MultiAppState, MultiAppStateHandler } from "./runtime/state"
 
 export type ChildState =
   | { type: "starting" }

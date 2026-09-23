@@ -7,8 +7,7 @@ import { join } from "node:path"
 import process from "node:process"
 
 import { logger } from "./logger"
-
-export type GatewayAddress = { socketPath: string } | { host: string; port: number }
+import type { GatewayAddress } from "./runtime/dispatch"
 
 export interface GatewayTarget {
   handle: RequestListener

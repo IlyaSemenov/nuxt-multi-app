@@ -33,6 +33,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Embed each application's Vite bridge options as literals in its Nitro bundle, including after renaming the bridge's `process` import.
 - Close children through their Nuxt lifecycle and prevent starts or forwarded restarts once their generation begins closing.
 - Register loaded child and layer configuration files with the child's native builder watcher before building.
+- Keep `src/runtime/` free of imports from outside it, including type-only imports; declare contracts it shares with build-time code inside `src/runtime/`.
 - Keep the value imports of `src/runtime/server.ts` and of the runtime files it uses limited to Node built-ins and sibling `src/runtime/` files; `src/build.ts` bundles the built entry with esbuild into portable output.
 
 ## Documentation

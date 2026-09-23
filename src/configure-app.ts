@@ -4,8 +4,8 @@ import type { NitroConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
 
 import { assertSupportedNuxt } from "./compat"
-import type { GatewayAddress } from "./gateway"
 import type { NormalizedAppOptions } from "./options"
+import type { GatewayAddress } from "./runtime/dispatch"
 
 const resolver = createResolver(import.meta.url)
 const runtimeDir = resolver.resolve("./runtime")

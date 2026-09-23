@@ -1,8 +1,4 @@
-import type { IncomingMessage, ServerResponse } from "node:http"
-
 import type { NuxtConfig } from "nuxt/schema"
-
-import type { AppId } from "./runtime/types"
 
 export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
 
@@ -22,23 +18,6 @@ export interface AppOptions {
   overrides?: AppOverrides
 }
 
-/** State passed to the optional state-handler module. */
-export type MultiAppState =
-  | { type: "unmatched"; host: string }
-  | { type: "starting"; appId: string }
-  | { type: "closing"; appId: string }
-  | { type: "failed"; appId: string; error: unknown }
-  | { type: "resolver-error"; error: unknown }
-
-/** Choose an application, continue with static routing, or force an unmatched response. */
-export type MultiAppResolver = (
-  host: string,
-  request: IncomingMessage,
-) => AppId | false | undefined | Promise<AppId | false | undefined>
-
-/** A project module factory that initializes one resolver before requests are accepted. */
-export type MultiAppResolverFactory = () => MultiAppResolver | Promise<MultiAppResolver>
-
 interface MultiAppRoutingGuards {
   /** Exact hosts or leading-wildcard host patterns, matched with OR semantics. */
   hosts?: string[]
@@ -50,16 +29,6 @@ interface MultiAppRoutingGuards {
 export type MultiAppRoutingRule =
   | (MultiAppRoutingGuards & { app: string; resolver?: never })
   | (MultiAppRoutingGuards & { resolver: string; app?: never })
-
-/** A state-handler module renders failures and requests that have no application. */
-export type MultiAppStateHandler = (
-  state: MultiAppState,
-  request: IncomingMessage,
-  response: ServerResponse,
-) => void | Promise<void>
-
-/** A project module factory that initializes one state handler before requests are accepted. */
-export type MultiAppStateHandlerFactory = () => MultiAppStateHandler | Promise<MultiAppStateHandler>
 
 /** Directory the module owns inside a Nitro output or Nuxt build directory. */
 export const MODULE_OUTPUT_DIR = "nuxt-multi-app"

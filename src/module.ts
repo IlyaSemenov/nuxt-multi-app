@@ -1,21 +1,24 @@
 import { defineNuxtModule } from "@nuxt/kit"
 
-import type { ModuleOptions, MultiAppResolverFactory, MultiAppStateHandlerFactory } from "./options"
+import type { ModuleOptions } from "./options"
 import { MODULE_DEFAULTS } from "./options"
+import type { MultiAppResolverFactory } from "./runtime/routing"
+import type { MultiAppStateHandlerFactory } from "./runtime/state"
 import { setupModule } from "./setup"
 
 export type {
   AppOptions,
   AppOverrides,
   ModuleOptions,
-  MultiAppResolver,
-  MultiAppResolverFactory,
   MultiAppRoutingRule,
+  RootOptions,
+} from "./options"
+export type { MultiAppResolver, MultiAppResolverFactory } from "./runtime/routing"
+export type {
   MultiAppState,
   MultiAppStateHandler,
   MultiAppStateHandlerFactory,
-  RootOptions,
-} from "./options"
+} from "./runtime/state"
 export type {
   AppId,
   NuxtMultiAppCreateFetch,

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import type { ServerResponse } from "node:http"
 
-import type { MultiAppState } from "../options"
-import { defaultStateHandler } from "./state"
+import { defaultStateHandler, type MultiAppState } from "./state"
 
 function render(state: MultiAppState) {
   let body: string | undefined

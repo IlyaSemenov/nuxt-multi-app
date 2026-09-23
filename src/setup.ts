@@ -13,18 +13,12 @@ import { configureNuxtApp } from "./configure-app"
 import { installDevRouting, type DevEndpoint } from "./dev-routing"
 import { createGateway } from "./gateway"
 import { normalizeOptions } from "./normalize-options"
-import type {
-  ModuleOptions,
-  MultiAppResolver,
-  MultiAppStateHandler,
-  NormalizedModuleOptions,
-  ProjectModule,
-} from "./options"
+import type { ModuleOptions, NormalizedModuleOptions, ProjectModule } from "./options"
 import { MODULE_OUTPUT_DIR, PROJECT_MODULES, resolverProjectModule } from "./options"
 import { prepareComposition } from "./prepare"
 import { loadFactory } from "./runtime/factories"
-import type { RuntimeRoutingRule } from "./runtime/routing"
-import { defaultStateHandler } from "./runtime/state"
+import type { MultiAppResolver, RuntimeRoutingRule } from "./runtime/routing"
+import { defaultStateHandler, type MultiAppStateHandler } from "./runtime/state"
 
 /** Run the Nuxt module lifecycle for prepare, development, or production build. */
 export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {

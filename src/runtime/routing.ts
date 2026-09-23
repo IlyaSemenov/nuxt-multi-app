@@ -1,7 +1,16 @@
 import type { IncomingMessage } from "node:http"
 
-import type { MultiAppResolver } from "../options"
 import { requestPath } from "./request"
+import type { AppId } from "./types"
+
+/** Choose an application, continue with static routing, or force an unmatched response. */
+export type MultiAppResolver = (
+  host: string,
+  request: IncomingMessage,
+) => AppId | false | undefined | Promise<AppId | false | undefined>
+
+/** A project module factory that initializes one resolver before requests are accepted. */
+export type MultiAppResolverFactory = () => MultiAppResolver | Promise<MultiAppResolver>
 
 /** One executable routing rule after project resolver factories have initialized. */
 export type RuntimeRoutingRule =

@@ -4,9 +4,10 @@ import type { Duplex } from "node:stream"
 
 import type { ChildState } from "./child"
 import { logger } from "./logger"
-import type { MultiAppStateHandler, NormalizedAppOptions } from "./options"
+import type { NormalizedAppOptions } from "./options"
 import { requestPath, sendReadiness } from "./runtime/request"
 import { normalizeHost, selectApplication, type RuntimeRoutingRule } from "./runtime/routing"
+import type { MultiAppStateHandler } from "./runtime/state"
 
 type UpgradeListener = (request: IncomingMessage, socket: Duplex, head: Buffer) => void
 
