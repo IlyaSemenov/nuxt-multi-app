@@ -348,7 +348,8 @@ async function assertStableRuntime(pages: Page[], request: APIRequestContext, re
       )
     }
   }
-  await Promise.all(Array.from({ length: 100 }, () => assertSsr(request, revision)))
+  // Interleave SSR of both applications, staying far below the listen backlog (128 on macOS).
+  await Promise.all(Array.from({ length: 10 }, () => assertSsr(request, revision)))
 }
 
 async function assertSsr(request: APIRequestContext, revision: string) {
