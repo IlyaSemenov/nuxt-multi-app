@@ -24,7 +24,7 @@ export function configureNuxtApp(nuxt: Nuxt, app: NormalizedAppOptions, settings
   nuxt.runWithContext(() =>
     addTypeTemplate(
       {
-        filename: "types/nuxt-multi-app.d.ts",
+        filename: "types/multi-app.d.ts",
         getContents: () => appIdDeclaration(settings.ids),
       },
       { nuxt: true, node: true, nitro: true },

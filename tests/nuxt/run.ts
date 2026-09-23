@@ -352,7 +352,7 @@ async function assertTypeProfiles() {
     const standalone = diagnosticsFor(probe, join(workspace, "web/.nuxt/tsconfig.app.json"))
     const mounted = diagnosticsFor(
       probe,
-      join(workspace, "root/.nuxt/multi-app/web/tsconfig.app.json"),
+      join(workspace, "root/.nuxt/multi-app/apps/web/tsconfig.app.json"),
     )
     assert(
       standalone.length > 0,
@@ -433,7 +433,7 @@ async function assertResolverStartupFailure(command: string[], cwd: string) {
 }
 
 async function assertStaticProductionRouting(cwd: string) {
-  const manifestPath = join(cwd, "output/nuxt-multi-app/manifest.json")
+  const manifestPath = join(cwd, "output/server/manifest.json")
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
   manifest.routing = manifest.routing.filter((rule: object) => !("resolver" in rule))
   manifest.stateHandler = null
@@ -553,10 +553,10 @@ try {
       "./tsconfig.server.json",
       "./tsconfig.shared.json",
       "./tsconfig.node.json",
-      "./multi-app/web/tsconfig.app.json",
-      "./multi-app/web/tsconfig.server.json",
-      "./multi-app/web/tsconfig.shared.json",
-      "./multi-app/web/tsconfig.node.json",
+      "./multi-app/apps/web/tsconfig.app.json",
+      "./multi-app/apps/web/tsconfig.server.json",
+      "./multi-app/apps/web/tsconfig.shared.json",
+      "./multi-app/apps/web/tsconfig.node.json",
     ],
   )
   await run(["bun", "run", "vue-tsc", "-b", "--noEmit", typecheckConfig], workspace)
@@ -580,17 +580,17 @@ try {
   await assertRestartableDev(workspace)
   await run(["bun", "run", "nuxt", "build", "root"], workspace)
   const manifest = JSON.parse(
-    await readFile(join(workspace, "root/.output/nuxt-multi-app/manifest.json"), "utf8"),
+    await readFile(join(workspace, "root/.output/server/manifest.json"), "utf8"),
   )
   assert.deepEqual(
     manifest.apps.map((app: { id: string; entry: string }) => [app.id, app.entry]),
     [
-      ["root", "../nuxt-multi-app/apps/root/server/index.mjs"],
-      ["web", "../nuxt-multi-app/apps/web/server/index.mjs"],
+      ["root", "../apps/root/server/index.mjs"],
+      ["web", "../apps/web/server/index.mjs"],
     ],
   )
   const rootEntry = await readFile(
-    join(workspace, "root/.output/nuxt-multi-app/apps/root/server/index.mjs"),
+    join(workspace, "root/.output/apps/root/server/index.mjs"),
     "utf8",
   )
   assert.match(rootEntry, /import "\.\/late-nitro-output\.mjs"/)

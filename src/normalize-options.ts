@@ -3,6 +3,7 @@ import { resolve } from "node:path"
 
 import type { Nuxt } from "nuxt/schema"
 
+import { appDir, moduleBuildDir } from "./layout"
 import { logger } from "./logger"
 import type {
   AppOptions,
@@ -95,7 +96,7 @@ function normalizeApp(
     id: app.id,
     rootDir: appRootDir,
     overrides: app.overrides ?? {},
-    buildDir: resolve(rootBuildDir, "multi-app", app.id),
+    buildDir: appDir(moduleBuildDir(rootBuildDir), app.id),
     isRoot: false,
   }
 }

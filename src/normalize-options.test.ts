@@ -95,7 +95,7 @@ describe("application directories", () => {
       nuxt,
     )
 
-    expect(options.apps[0]!.buildDir).toBe(resolve(rootDir, ".nuxt/multi-app/web"))
+    expect(options.apps[0]!.buildDir).toBe(resolve(rootDir, ".nuxt/multi-app/apps/web"))
   })
 
   it("places the default parent inside a custom root Nuxt build directory", () => {
@@ -111,6 +111,6 @@ describe("application directories", () => {
       customNuxt,
     )
 
-    expect(options.apps[0]!.buildDir).toBe(resolve(customBuildDir, "multi-app/web"))
+    expect(options.apps[0]!.buildDir).toBe(resolve(customBuildDir, "multi-app/apps/web"))
   })
 })

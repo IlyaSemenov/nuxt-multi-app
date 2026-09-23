@@ -12,13 +12,17 @@ import { setupDevAdapter } from "./compat"
 import { configureNuxtApp } from "./configure-app"
 import { installDevRouting, type DevEndpoint } from "./dev-routing"
 import { createGateway } from "./gateway"
+import { moduleBuildDir, resolverFile, serverDir, STATE_HANDLER_FILE } from "./layout"
 import { normalizeOptions } from "./normalize-options"
-import type { ModuleOptions, NormalizedModuleOptions, ProjectModule } from "./options"
-import { MODULE_OUTPUT_DIR, PROJECT_MODULES, resolverProjectModule } from "./options"
+import type { ModuleOptions, NormalizedModuleOptions } from "./options"
 import { prepareComposition } from "./prepare"
 import { loadFactory } from "./runtime/factories"
-import { mapResolvers, type MultiAppResolver } from "./runtime/routing"
-import { defaultStateHandler, type MultiAppStateHandler } from "./runtime/state"
+import { mapResolvers, resolverLabel, type MultiAppResolver } from "./runtime/routing"
+import {
+  defaultStateHandler,
+  STATE_HANDLER_LABEL,
+  type MultiAppStateHandler,
+} from "./runtime/state"
 
 /** Run the Nuxt module lifecycle for prepare, development, or production build. */
 export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
@@ -110,21 +114,25 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
 }
 
 async function loadDevModules(options: NormalizedModuleOptions, nuxt: Nuxt) {
-  const outputDir = resolve(nuxt.options.buildDir, MODULE_OUTPUT_DIR)
   async function load<T extends (...args: never[]) => unknown>(
     input: string,
-    module: ProjectModule,
+    file: string,
+    label: string,
   ) {
-    const output = resolve(outputDir, module.file)
+    const output = resolve(serverDir(moduleBuildDir(nuxt.options.buildDir)), file)
     await bundleProjectModule(input, output, nuxt)
     // The query defeats the ESM cache, so a full Nuxt restart imports the freshly bundled module.
-    return loadFactory<T>(`${pathToFileURL(output).href}?t=${Date.now()}`, module.name)
+    return loadFactory<T>(`${pathToFileURL(output).href}?t=${Date.now()}`, label)
   }
   const routing = await mapResolvers(options.routing, (input, index) =>
-    load<MultiAppResolver>(input, resolverProjectModule(index)),
+    load<MultiAppResolver>(input, resolverFile(index), resolverLabel(index)),
   )
   const stateHandler = options.stateHandler
-    ? await load<MultiAppStateHandler>(options.stateHandler, PROJECT_MODULES.stateHandler)
+    ? await load<MultiAppStateHandler>(
+        options.stateHandler,
+        STATE_HANDLER_FILE,
+        STATE_HANDLER_LABEL,
+      )
     : defaultStateHandler
   return [routing, stateHandler] as const
 }

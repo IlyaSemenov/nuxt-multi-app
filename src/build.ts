@@ -1,5 +1,5 @@
 import { copyFile, readFile, writeFile } from "node:fs/promises"
-import { dirname, resolve } from "node:path"
+import { resolve } from "node:path"
 
 import { buildNuxt, createResolver, loadNuxt } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
@@ -8,17 +8,18 @@ import type { Nuxt } from "nuxt/schema"
 import { bundleForOutput, bundleProjectModule } from "./bundle"
 import { withGlobalNuxtContext } from "./compat"
 import { applyHandlerOutput, configureNuxtApp } from "./configure-app"
-import { relativePath } from "./layout"
+import {
+  appDir,
+  PRODUCTION_ENTRY,
+  relativePath,
+  resolverFile,
+  serverDir,
+  STATE_HANDLER_FILE,
+} from "./layout"
 import { logger } from "./logger"
 import type { NormalizedAppOptions, NormalizedModuleOptions } from "./options"
-import {
-  MODULE_OUTPUT_DIR,
-  PRODUCTION_ENTRY,
-  PROJECT_MODULES,
-  resolverProjectModule,
-} from "./options"
 import { childOverrides } from "./overrides"
-import type { ProductionManifest } from "./runtime/registry"
+import { MANIFEST_FILE, type ProductionManifest } from "./runtime/registry"
 import { mapResolvers } from "./runtime/routing"
 
 const resolver = createResolver(import.meta.url)
@@ -54,7 +55,7 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
       root.hook("close", async () => {
         await copyFile(
           resolve(output.dir, "nitro.json"),
-          resolve(output.dir, MODULE_OUTPUT_DIR, "apps", options.root.id, "nitro.json"),
+          resolve(appDir(output.dir, options.root.id), "nitro.json"),
         )
         await writeProductionServer(output.dir, entries, options, root)
       })
@@ -73,7 +74,7 @@ async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: str
     ...overrides.nitro,
     output: {
       ...overrides.nitro?.output,
-      dir: resolve(outputDir, MODULE_OUTPUT_DIR, "apps", app.id),
+      dir: appDir(outputDir, app.id),
     },
   }
   const child = await loadNuxt({
@@ -102,9 +103,9 @@ function captureNitroOutput(nuxt: Nuxt, rootId?: string) {
   let output: NitroOutput | undefined
   nuxt.hook("nitro:init", (nitro) => {
     if (rootId !== undefined) {
-      const appDir = resolve(nitro.options.output.dir, MODULE_OUTPUT_DIR, "apps", rootId)
-      nitro.options.output.serverDir = resolve(appDir, "server")
-      nitro.options.output.publicDir = resolve(appDir, "public")
+      const rootDir = appDir(nitro.options.output.dir, rootId)
+      nitro.options.output.serverDir = resolve(rootDir, "server")
+      nitro.options.output.publicDir = resolve(rootDir, "public")
     }
     output = {
       dir: nitro.options.output.dir,
@@ -124,20 +125,19 @@ async function writeProductionServer(
   nuxt: Nuxt,
 ) {
   const entry = resolve(outputDir, PRODUCTION_ENTRY)
-  const entryDir = dirname(entry)
-  const moduleDir = resolve(outputDir, MODULE_OUTPUT_DIR)
+  const entryDir = serverDir(outputDir)
   // The output runs without this package installed, so the entry is bundled from the built runtime.
   await bundleForOutput(serverEntry, entry)
 
   const routing = await mapResolvers(options.routing, async (input, index) => {
-    const output = resolve(moduleDir, resolverProjectModule(index).file)
+    const output = resolve(entryDir, resolverFile(index))
     await bundleProjectModule(input, output, nuxt)
     return relativePath(entryDir, output)
   })
 
   let stateHandler: string | null = null
   if (options.stateHandler) {
-    const output = resolve(moduleDir, PROJECT_MODULES.stateHandler.file)
+    const output = resolve(entryDir, STATE_HANDLER_FILE)
     await bundleProjectModule(options.stateHandler, output, nuxt)
     stateHandler = relativePath(entryDir, output)
   }
@@ -151,7 +151,7 @@ async function writeProductionServer(
     shutdownTimeout: options.shutdownTimeout,
     debug: options.debug,
   }
-  await writeFile(resolve(moduleDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
+  await writeFile(resolve(entryDir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`)
   await setPreviewCommand(outputDir)
   logger.info(`entry ${entry}`)
 }

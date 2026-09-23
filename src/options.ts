@@ -1,7 +1,6 @@
 import type { NuxtConfig } from "nuxt/schema"
 
-import { resolverLabel, type RoutingGuards, type RoutingRule } from "./runtime/routing"
-import { STATE_HANDLER_LABEL } from "./runtime/state"
+import type { RoutingGuards, RoutingRule } from "./runtime/routing"
 
 export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
 
@@ -25,28 +24,6 @@ export interface AppOptions {
 export type MultiAppRoutingRule =
   | (RoutingGuards & { app: string; resolver?: never })
   | (RoutingGuards & { resolver: string; app?: never })
-
-/** Directory the module owns inside a Nitro output or Nuxt build directory. */
-export const MODULE_OUTPUT_DIR = "nuxt-multi-app"
-
-/** Generated production entry, relative to the root Nitro output directory. */
-export const PRODUCTION_ENTRY = "server/index.mjs"
-
-/** Project modules bundled into generated output, keyed by their `ModuleOptions` field. */
-export const PROJECT_MODULES = {
-  stateHandler: { file: "state-handler.mjs", name: STATE_HANDLER_LABEL },
-} as const satisfies Record<string, ProjectModule>
-
-/** Generated filename and diagnostic label for one bundled project module. */
-export interface ProjectModule {
-  file: string
-  name: string
-}
-
-/** Describe the generated module for a resolver at one routing-list index. */
-export function resolverProjectModule(index: number): ProjectModule {
-  return { file: `resolver-${index + 1}.mjs`, name: resolverLabel(index) }
-}
 
 /** Values applied to every option the project leaves unset. */
 export const MODULE_DEFAULTS = {

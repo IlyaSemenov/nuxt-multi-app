@@ -9,8 +9,8 @@ describe("relative output paths", () => {
   })
 
   it("keeps parent traversals as they are", () => {
-    expect(relativePath("/out/server", "/out/nuxt-multi-app/resolver-1.mjs")).toBe(
-      "../nuxt-multi-app/resolver-1.mjs",
+    expect(relativePath("/out/server", "/out/apps/web/server/index.mjs")).toBe(
+      "../apps/web/server/index.mjs",
     )
   })
 })

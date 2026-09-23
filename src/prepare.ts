@@ -6,7 +6,7 @@ import type { Nuxt } from "nuxt/schema"
 
 import { withGlobalNuxtContext } from "./compat"
 import { configureNuxtApp } from "./configure-app"
-import { relativePath } from "./layout"
+import { relativePath, TYPECHECK_SOLUTION } from "./layout"
 import type { NormalizedModuleOptions } from "./options"
 import { childOverrides } from "./overrides"
 
@@ -16,10 +16,7 @@ const TYPESCRIPT_PROJECTS = ["app", "server", "shared", "node"] as const
 export function prepareComposition(options: NormalizedModuleOptions, root: Nuxt) {
   root.hook("prepare:types", async () => {
     await mkdir(options.root.buildDir, { recursive: true })
-    await writeFile(
-      resolve(options.root.buildDir, "tsconfig.multi-app.json"),
-      typecheckSolution(options),
-    )
+    await writeFile(resolve(options.root.buildDir, TYPECHECK_SOLUTION), typecheckSolution(options))
   })
   // Nuxt CLI clears the root build directory after module setup, so nested child artifacts must
   // be generated from the build lifecycle that follows that cleanup.

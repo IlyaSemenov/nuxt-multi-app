@@ -163,7 +163,7 @@ Add `overrides` to an `apps` entry to apply configuration only while the child r
 
 `nuxt prepare` writes type files for the root and every child without building bundles.
 
-A mounted child generates into `<root-build-dir>/multi-app/<app-id>`.
+A mounted child generates into `<root-build-dir>/multi-app/apps/<app-id>`, mirroring the `apps/<app-id>` layout of the production output.
 This keeps every composition-specific artifact under the application that owns the composition and leaves the child's standalone `.nuxt` directory independent.
 
 The root also writes `.nuxt/tsconfig.multi-app.json`, a TypeScript solution that references every generated project in the composition.
@@ -314,13 +314,13 @@ Everything lands in the root application's `.output`:
 ```text
 .output/
 ├── nitro.json           # Nitro build metadata and preview command
-├── server/index.mjs     # process entry point
-└── nuxt-multi-app/
-    ├── apps/<app-id>/   # Nitro bundle and public assets for every application
+├── apps/<app-id>/       # Nitro bundle and public assets for every application
+└── server/
+    ├── index.mjs        # process entry point
     └── manifest.json    # routing configuration the server reads
 ```
 
-The root application uses the same `nuxt-multi-app/apps/<app-id>` layout as its children.
+The root application uses the same `apps/<app-id>` layout as its children.
 The standard Nitro entry combines those isolated outputs behind one server process.
 
 The entry listens on `NITRO_PORT` or `PORT`, default `3000`, and on `NITRO_HOST` or `HOST` when one is set, like Nitro's `node-server` preset.

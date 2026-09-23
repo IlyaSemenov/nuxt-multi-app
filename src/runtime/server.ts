@@ -12,7 +12,7 @@ import type {
   ProductionRuntime,
   UpgradeHandler,
 } from "./registry"
-import { runtimeSymbol } from "./registry"
+import { MANIFEST_FILE, runtimeSymbol } from "./registry"
 import { requestPath, sendReadiness } from "./request"
 import {
   mapResolvers,
@@ -33,7 +33,7 @@ interface App {
 }
 
 const manifest = JSON.parse(
-  await readFile(new URL("../nuxt-multi-app/manifest.json", import.meta.url), "utf8"),
+  await readFile(new URL(`./${MANIFEST_FILE}`, import.meta.url), "utf8"),
 ) as ProductionManifest
 const ids = manifest.apps.map(({ id }) => id)
 const routing = await mapResolvers(manifest.routing, (resolver, index) =>
