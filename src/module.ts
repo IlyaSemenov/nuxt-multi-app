@@ -22,6 +22,7 @@ export type {
 export type {
   AppId,
   NuxtMultiAppCreateFetch,
+  NuxtMultiAppCreateFetchOptions,
   NuxtMultiAppDispatch,
   NuxtMultiAppDispatchOptions,
   NuxtMultiAppFetch,
