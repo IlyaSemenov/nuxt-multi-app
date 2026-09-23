@@ -1,9 +1,5 @@
-import type { Buffer } from "node:buffer"
-import type { IncomingMessage, Server } from "node:http"
-import { createServer } from "node:http"
 import { dirname, resolve } from "node:path"
 import process from "node:process"
-import type { Duplex } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 import { nuxtCtx } from "@nuxt/kit"
@@ -12,6 +8,8 @@ import { toNodeListener } from "h3"
 import MagicString from "magic-string"
 import type { Nuxt } from "nuxt/schema"
 import { satisfies } from "semver"
+
+import type { UpgradeHandler } from "../runtime/contract"
 
 const SUPPORTED_NUXT = "~4.5.2"
 
@@ -45,10 +43,8 @@ export async function withGlobalNuxtContext(nuxt: Nuxt, load: (nuxt: Nuxt) => Pr
   }
 }
 
-/** Apply the version-specific Nuxt and Nitro development-server adaptations. */
-export function setupDevAdapter(nuxt: Nuxt, id: string) {
-  assertSupportedNuxt(nuxt)
-
+/** Embed this application's Vite bridge in its Nitro development bundle. */
+export function inlineViteBridge(nuxt: Nuxt, id: string) {
   // Nitro workers must retain the Vite bridge belonging to their own Nuxt instance after reload.
   nuxt.hook("nitro:build:before", (nitro) => {
     const options = process.env.NUXT_VITE_NODE_OPTIONS
@@ -124,35 +120,6 @@ export function setupDevAdapter(nuxt: Nuxt, id: string) {
         ? false
         : external(source, importer, resolved)
   })
-
-  const transport = createServer()
-  let publicServer: Server
-  function attach(server: Server) {
-    publicServer = server
-  }
-
-  nuxt.hook("vite:extendConfig", (config, { isClient }) => {
-    if (!isClient) return
-    const address = publicServer.address()
-    if (!address || typeof address === "string") {
-      throw new Error("nuxt-multi-app: an external TCP listener is required for Vite HMR")
-    }
-    if (!config.server) throw new Error("nuxt-multi-app: Vite server config is missing")
-    config.server.hmr = {
-      ...(typeof config.server.hmr === "object" ? config.server.hmr : {}),
-      server: transport,
-      path: `nuxt-multi-app/${id}/hmr`,
-      clientPort: address.port,
-    }
-  })
-
-  return {
-    transport,
-    attach,
-    upgrade(request: IncomingMessage, socket: Duplex, head: Buffer) {
-      transport.emit("upgrade", request, socket, head)
-    },
-  }
 }
 
 /** Restart a mounted child when its loaded Nuxt or layer configuration changes. */
@@ -176,12 +143,6 @@ export function getDevHandler(nuxt: Nuxt) {
 
 /** Return Nitro's application WebSocket upgrade handler when it is available. */
 export function getDevUpgrade(nuxt: Nuxt) {
-  const server = nuxt.server as typeof nuxt.server & {
-    upgrade?: (
-      request: import("node:http").IncomingMessage,
-      socket: import("node:stream").Duplex,
-      head: Buffer,
-    ) => unknown
-  }
+  const server = nuxt.server as typeof nuxt.server & { upgrade?: UpgradeHandler }
   return typeof server?.upgrade === "function" ? server.upgrade.bind(server) : undefined
 }

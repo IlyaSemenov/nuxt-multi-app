@@ -6,7 +6,7 @@ import type { Nuxt } from "nuxt/schema"
 
 import { bundleProjectModule } from "../bundle"
 import { FALLBACK_FILE, moduleBuildDir, resolverFile, serverDir } from "../layout"
-import { setupDevAdapter } from "../nuxt/compat"
+import { inlineViteBridge } from "../nuxt/compat"
 import { configureNuxtApp } from "../nuxt/configure"
 import type { NormalizedModuleOptions } from "../options"
 import { loadFactory } from "../runtime/factories"
@@ -14,6 +14,7 @@ import { defaultFallback, FALLBACK_LABEL, type MultiAppFallback } from "../runti
 import { mapResolvers, resolverLabel, type MultiAppResolver } from "../runtime/routing"
 import { createChild, type ChildState } from "./child"
 import { createGateway } from "./gateway"
+import { setupHmr } from "./hmr"
 import { installDevRouting, type DevEndpoint } from "./routing"
 
 /** Serve the root and every mounted child behind the Nuxt CLI listener during `nuxt dev`. */
@@ -31,7 +32,8 @@ export async function setupDevelopment(
     token: gateway.token,
     projectModules,
   })
-  const rootAdapter = setupDevAdapter(nuxt, options.root.id)
+  inlineViteBridge(nuxt, options.root.id)
+  const rootHmr = setupHmr(nuxt, options.root.id)
   nuxt.hook("nitro:init", (nitro) => {
     nitro.hooks.hook("dev:reload", () => gateway.invalidate(options.root.id))
   })
@@ -55,7 +57,7 @@ export async function setupDevelopment(
   let devRouting: ReturnType<typeof installDevRouting> | undefined
   nuxt.hook("listen", async (server: Server) => {
     publicServer = server
-    rootAdapter.attach(server)
+    rootHmr.attach(server)
     const [routing, fallback] = await loadDevModules(options, nuxt)
     children = options.apps.map((app) =>
       createChild(app, nuxt, ids, gateway, fallback, options.debug),
@@ -64,7 +66,7 @@ export async function setupDevelopment(
     devRouting = installDevRouting(
       server,
       [rootEndpoint, ...children],
-      rootAdapter.upgrade,
+      rootHmr.upgrade,
       routing,
       fallback,
       options.readinessPath,

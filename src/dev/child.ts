@@ -9,7 +9,7 @@ import { logger } from "../logger"
 import {
   getDevHandler,
   getDevUpgrade,
-  setupDevAdapter,
+  inlineViteBridge,
   watchChildConfig,
   withGlobalNuxtContext,
 } from "../nuxt/compat"
@@ -17,6 +17,7 @@ import { loadChildNuxt } from "../nuxt/load-child"
 import type { NormalizedAppOptions } from "../options"
 import type { GatewayAddress } from "../runtime/dispatch"
 import type { MultiAppFallbackReason, MultiAppFallback } from "../runtime/fallback"
+import { setupHmr } from "./hmr"
 
 export type ChildState =
   | { type: "starting" }
@@ -35,7 +36,7 @@ export function createChild(
 ) {
   const log = logger.withTag(options.id)
   let nuxt: Nuxt | undefined
-  let adapter: ReturnType<typeof setupDevAdapter> | undefined
+  let hmr: ReturnType<typeof setupHmr> | undefined
   let handler: RequestListener | undefined
   let appUpgrade: ReturnType<typeof getDevUpgrade>
   let starting: Promise<void> | undefined
@@ -52,8 +53,9 @@ export function createChild(
     nuxt.hook("nitro:init", (nitro) => {
       nitro.hooks.hook("dev:reload", () => gateway.invalidate(options.id))
     })
-    adapter = setupDevAdapter(nuxt, options.id)
-    adapter.attach(server)
+    inlineViteBridge(nuxt, options.id)
+    hmr = setupHmr(nuxt, options.id)
+    hmr.attach(server)
     // A watcher from the retiring generation must not restart the root again during teardown.
     nuxt.hook("restart", (options) => {
       if (!closing) return root.callHook("restart", options)
@@ -105,7 +107,7 @@ export function createChild(
       }
       if (request.headers["sec-websocket-protocol"] === "vite-hmr") {
         if (debug) log.info(`HMR upgrade ${request.url}`)
-        adapter!.upgrade(request, socket, head)
+        hmr!.upgrade(request, socket, head)
         return
       }
       if (appUpgrade) await appUpgrade(request, socket, head)
