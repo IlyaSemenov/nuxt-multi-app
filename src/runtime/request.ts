@@ -1,24 +1,10 @@
-import type { IncomingMessage, ServerResponse } from "node:http"
+import type { IncomingMessage } from "node:http"
 
 /** Return the raw pathname without decoding or normalizing request segments. */
 export function requestPath(request: IncomingMessage) {
   const target = request.url ?? "/"
   const query = target.indexOf("?")
   return query === -1 ? target : target.slice(0, query)
-}
-
-/** Answer the readiness endpoint from the lifecycle state of every application. */
-export function sendReadiness(
-  response: ServerResponse,
-  states: Record<string, string>,
-  debug: boolean,
-) {
-  const ready = Object.values(states).every((state) => state === "ready")
-  response.statusCode = ready ? 200 : 503
-  response.setHeader("content-type", "application/json; charset=utf-8")
-  response.setHeader("cache-control", "no-store")
-  if (!ready) response.setHeader("retry-after", "1")
-  response.end(JSON.stringify({ ready, apps: debug ? states : undefined }))
 }
 
 /**

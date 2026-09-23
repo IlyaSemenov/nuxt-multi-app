@@ -57,6 +57,7 @@ export async function setupModule(input: ModuleOptions, nuxt: Nuxt) {
   })
   let rootState: ChildState = { type: "starting" }
   const rootEndpoint: DevEndpoint = {
+    id: options.root.id,
     options: options.root,
     get state() {
       return rootState

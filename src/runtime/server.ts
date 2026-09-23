@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 import { readFile } from "node:fs/promises"
-import type { IncomingMessage, RequestListener, ServerResponse } from "node:http"
+import type { RequestListener } from "node:http"
 import { createServer } from "node:http"
 import process from "node:process"
 
@@ -14,14 +14,8 @@ import type {
   UpgradeHandler,
 } from "./registry"
 import { MANIFEST_FILE, runtimeSymbol } from "./registry"
-import { requestPath, sendReadiness } from "./request"
-import {
-  mapResolvers,
-  normalizeHost,
-  resolverLabel,
-  selectApplication,
-  type MultiAppResolver,
-} from "./routing"
+import { createRouter } from "./router"
+import { mapResolvers, resolverLabel, type MultiAppResolver } from "./routing"
 
 interface App {
   id: string
@@ -124,14 +118,26 @@ for (const definition of manifest.apps) {
   appsById.set(app.id, app)
 }
 
-const choose = (request: IncomingMessage) => selectApplication(apps, routing, request)
+const router = createRouter({
+  apps,
+  routing,
+  fallback,
+  readinessPath: manifest.readinessPath,
+  readiness: () => Object.fromEntries(apps.map((app) => [app.id, closing ? "closing" : "ready"])),
+  debug: manifest.debug,
+  logger: {
+    info: (message) => console.log(`[nuxt-multi-app] ${message}`),
+    error: (message, error) => console.error(`[nuxt-multi-app] ${message}`, error),
+  },
+  handle: (app, request, response) => context.run(app, () => app.handler(request, response)),
+  upgrade: (app, request, socket, head) => {
+    const upgrade = app.upgrade
+    if (!upgrade || closing) return socket.destroy()
+    return context.run(app, () => upgrade(request, socket, head))
+  },
+})
 
 const server = createServer((request, response) => {
-  if (manifest.readinessPath && requestPath(request) === manifest.readinessPath) {
-    const state = closing ? "closing" : "ready"
-    sendReadiness(response, Object.fromEntries(apps.map((app) => [app.id, state])), manifest.debug)
-    return
-  }
   const marker = {}
   activeRequests.add(marker)
   const finish = () => {
@@ -140,49 +146,9 @@ const server = createServer((request, response) => {
   }
   response.once("finish", finish)
   response.once("close", finish)
-  void choose(request)
-    .then((app) => {
-      if (!app) {
-        return fallback(
-          { type: "unmatched", host: normalizeHost(request.headers.host) },
-          request,
-          response,
-        )
-      }
-      if (manifest.debug && request.headers.accept?.includes("text/html")) {
-        console.log(`[nuxt-multi-app] ${request.headers.host ?? ""} -> ${app.id}`)
-      }
-      return context.run(app, () => app.handler(request, response))
-    })
-    .catch((error) => fallback({ type: "resolver-error", error }, request, response))
-    .catch((error) => fail(response, error))
+  router.request(request, response)
 })
-
-server.on("upgrade", (request, socket, head) => {
-  void choose(request)
-    .then((app) => {
-      const upgrade = app?.upgrade
-      if (!app || !upgrade || closing) {
-        socket.destroy()
-        return
-      }
-      return context.run(app, () => upgrade(request, socket, head))
-    })
-    .catch((error) => {
-      // A peer that leaves during the upgrade destroys the socket itself; only report live failures.
-      if (!socket.destroyed) console.error("[nuxt-multi-app] WebSocket routing failed", error)
-      socket.destroy()
-    })
-})
-
-function fail(response: ServerResponse, error: unknown) {
-  console.error("[nuxt-multi-app]", error)
-  if (response.headersSent) response.destroy(error as Error)
-  else {
-    response.statusCode = 500
-    response.end("Nuxt application routing failed")
-  }
-}
+server.on("upgrade", router.upgrade)
 
 // A dispatch remains active until its body is consumed or cancelled, not merely until headers arrive.
 function trackResponse(response: Response, done: () => void) {
