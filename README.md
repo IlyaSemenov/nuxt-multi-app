@@ -163,8 +163,8 @@ Add `overrides` to an `apps` entry to apply configuration only while the child r
 
 `nuxt prepare` writes type files for the root and every child without building bundles.
 
-A mounted child generates into `<root-build-dir>/multi-app/apps/<app-id>`, mirroring the `apps/<app-id>` layout of the production output.
-This keeps every composition-specific artifact under the application that owns the composition and leaves the child's standalone `.nuxt` directory independent.
+A mounted child generates files in `<child>/.nuxt/cache/nuxt-multi-app/<root-id>-<hash>`, with a separate directory for each composition.
+The child's standalone `nuxt prepare` and `nuxt build` preserve this directory; `nuxt cleanup` deletes it.
 
 The root also writes `.nuxt/tsconfig.multi-app.json`, a TypeScript solution that references every generated project in the composition.
 Check the root and every mounted child with the Vue-aware TypeScript checker used by your project, such as `vue-tsc`:
@@ -175,6 +175,13 @@ vue-tsc -b --noEmit apps/landing/.nuxt/tsconfig.multi-app.json
 
 Resolver and fallback files are added to the root's generated `tsconfig.node.json`, and `event.context.nuxtMultiApp` is typed in every application's Nitro types.
 Running `nuxt prepare` also generates the configured application IDs, so resolver results, `dispatch()`, and `createFetch()` reject unknown IDs during type checking.
+
+### Custom build directories
+
+Set `apps[].buildDir` to change a mounted child's build directory.
+Relative paths are resolved from the root application's directory.
+Package imports from the chosen directory must resolve to the child's dependencies.
+Use a separate directory for each mounted application, distinct from its standalone build directory.
 
 ## Calling another application during SSR
 

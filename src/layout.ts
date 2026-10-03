@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { isAbsolute, relative, resolve, sep } from "node:path"
 
 const SERVER_DIR = "server"
@@ -6,22 +7,37 @@ const SERVER_DIR = "server"
 export const PRODUCTION_ENTRY = `${SERVER_DIR}/index.mjs`
 
 /**
- * Directory the module owns inside a Nuxt build directory.
+ * Directory the module owns inside the root Nuxt build directory.
  *
- * Its layout mirrors the root Nitro output directory, so `appDir()` and `serverDir()` apply to both.
+ * Like the root Nitro output directory, it holds bundled project modules under `serverDir()`.
  */
 export function moduleBuildDir(buildDir: string) {
   return resolve(buildDir, "multi-app")
 }
 
 /**
- * Directory of one application in the root Nitro output directory or in `moduleBuildDir()`.
+ * Directory of one application in the root Nitro output directory.
  *
- * Every application's Nitro output, the root's included, lands in `.output/apps/<id>`, and a mounted
- * child builds into `.nuxt/multi-app/apps/<id>`.
+ * Every application's Nitro output, the root's included, lands in `.output/apps/<id>`.
  */
 export function appDir(baseDir: string, id: string) {
   return resolve(baseDir, "apps", id)
+}
+
+/**
+ * Build directory of a mounted child, inside the child's own tree.
+ *
+ * Generated files import packages by bare specifiers, so they must resolve from the child's
+ * dependencies, as in a standalone run, even when the root is installed separately.
+ * The directory lives in `.nuxt/cache`, which tools ignore with `.nuxt` and which the Nuxt CLI keeps
+ * when it clears the child's standalone build; `node_modules` would hide the generated TypeScript
+ * projects' files from their own `include` patterns.
+ * The directory is keyed by the root's build directory, so every root that mounts the same child,
+ * such as one per worktree, gets its own copy.
+ */
+export function mountedBuildDir(childRootDir: string, rootId: string, rootBuildDir: string) {
+  const rootKey = createHash("sha256").update(resolve(rootBuildDir)).digest("hex").slice(0, 12)
+  return resolve(childRootDir, ".nuxt/cache/nuxt-multi-app", `${rootId}-${rootKey}`)
 }
 
 /** Directory of the production entry and of the bundled project modules it loads. */

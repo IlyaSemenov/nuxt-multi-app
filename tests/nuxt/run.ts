@@ -1,13 +1,13 @@
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { connect, createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import ts from "typescript"
 
-import { readViteSnapshots } from "./snapshots"
+import { mountedWebBuildDir, readViteSnapshots } from "./snapshots"
 
 const root = resolve(import.meta.dir, "../..")
 const fixture = join(root, "tests/fixtures")
@@ -232,6 +232,7 @@ async function checkServer(
       "WEB_HMR_0",
       "web-auto-import",
       "child-component",
+      "child-only-props",
       "ISOLATED_COMPONENT",
     ])
     for (const path of ["/api/owner", "/api/dispatch"]) {
@@ -290,6 +291,7 @@ async function assertRestartableDev(cwd: string) {
   )
   try {
     await waitUntilReady(origin, child)
+    await assertStandaloneChildRuns(origin, child)
   } finally {
     const snapshots = await readViteSnapshots(workspace)
     child.kill("SIGINT")
@@ -352,7 +354,7 @@ async function assertTypeProfiles() {
     const standalone = diagnosticsFor(probe, join(workspace, "web/.nuxt/tsconfig.app.json"))
     const mounted = diagnosticsFor(
       probe,
-      join(workspace, "root/.nuxt/multi-app/apps/web/tsconfig.app.json"),
+      join(await mountedWebBuildDir(workspace), "tsconfig.app.json"),
     )
     assert(
       standalone.length > 0,
@@ -542,22 +544,27 @@ try {
     ),
   )
   await run(["bun", "install", "--ignore-scripts"], workspace)
+  await installChildOnlyDependency()
   await run(["bun", "run", "nuxt", "prepare", "web"], workspace)
   await run(["bun", "run", "nuxt", "prepare", "root"], workspace)
   const typecheckConfig = join(workspace, "root/.nuxt/tsconfig.multi-app.json")
   const typecheckSolution = JSON.parse(await readFile(typecheckConfig, "utf8"))
+  const webBuildDir = await mountedWebBuildDir(workspace)
+  // The solution lives in the root build directory, while the mounted child's projects live in the
+  // child's own tree; compare resolved files so the check does not depend on symlinked temp paths.
   assert.deepEqual(
-    typecheckSolution.references.map(({ path }: { path: string }) => path),
-    [
-      "./tsconfig.app.json",
-      "./tsconfig.server.json",
-      "./tsconfig.shared.json",
-      "./tsconfig.node.json",
-      "./multi-app/apps/web/tsconfig.app.json",
-      "./multi-app/apps/web/tsconfig.server.json",
-      "./multi-app/apps/web/tsconfig.shared.json",
-      "./multi-app/apps/web/tsconfig.node.json",
-    ],
+    await Promise.all(
+      typecheckSolution.references.map(({ path }: { path: string }) =>
+        realpath(resolve(workspace, "root/.nuxt", path)),
+      ),
+    ),
+    await Promise.all(
+      [join(workspace, "root/.nuxt"), webBuildDir].flatMap((buildDir) =>
+        ["app", "server", "shared", "node"].map((project) =>
+          realpath(join(buildDir, `tsconfig.${project}.json`)),
+        ),
+      ),
+    ),
   )
   await run(["bun", "run", "vue-tsc", "-b", "--noEmit", typecheckConfig], workspace)
   await assertPackageDeclarations()
@@ -607,4 +614,48 @@ try {
 } finally {
   await rm(workspace, { recursive: true, force: true })
   await rm(portable, { recursive: true, force: true })
+}
+
+/**
+ * Install a package that only the child can resolve, as when the root and the child are installed
+ * separately. Nuxt keeps bare specifiers of the child's declared dependencies in its generated
+ * declarations, and the Vue compiler follows them when a child component declares props with an
+ * auto-imported type.
+ */
+async function installChildOnlyDependency() {
+  const packageDir = join(workspace, "web/node_modules/child-only-dependency")
+  await mkdir(packageDir, { recursive: true })
+  await writeFile(
+    join(packageDir, "package.json"),
+    '{"name":"child-only-dependency","main":"index.js","types":"index.d.ts"}',
+  )
+  await writeFile(join(packageDir, "index.js"), "")
+  await writeFile(
+    join(packageDir, "index.d.ts"),
+    "export interface ChildOnlyProps {\n  label: string\n}\n",
+  )
+}
+
+/**
+ * A standalone `prepare` and `build` of the child clear its own build directory; the running
+ * composition must keep serving the mounted child and keep picking up its source changes.
+ */
+async function assertStandaloneChildRuns(origin: string, server: ReturnType<typeof Bun.spawn>) {
+  await run(["bun", "run", "nuxt", "prepare", "web"], workspace)
+  await run(["bun", "run", "nuxt", "build", "web"], workspace)
+  await assertResponse(origin, "/", hosts.web, 200, "WEB_HMR_0")
+
+  const page = join(workspace, "web/app/app.vue")
+  const source = await readFile(page, "utf8")
+  await writeFile(page, source.replace("WEB_HMR_0", "WEB_HMR_STANDALONE"))
+  try {
+    await waitUntil(
+      server,
+      async () =>
+        (await (await request(origin, "/", hosts.web)).text()).includes("WEB_HMR_STANDALONE"),
+      "Mounted child stopped reloading after a standalone build",
+    )
+  } finally {
+    await writeFile(page, source)
+  }
 }

@@ -9,6 +9,7 @@ const { $instance, $isolated } = useNuxtApp()
     <p id="instance">{{ $instance }} / {{ $isolated }}</p>
     {{ useChildLabel() }}
     <ChildMarker />
+    <ChildOnlyProps label="child-only-props" />
     <IsolatedBadge />
     <button type="button" @click="count++">Count {{ count }}</button>
   </main>

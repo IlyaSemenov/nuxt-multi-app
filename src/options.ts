@@ -16,6 +16,12 @@ export interface AppOptions {
   id: string
   /** Application root, resolved from the root application's directory. */
   rootDir: string
+  /**
+   * Directory for the files Nuxt generates and builds for this mount, resolved from the root
+   * application's directory; defaults to `.nuxt/cache/nuxt-multi-app/<root-id>-<hash>`
+   * inside the application root.
+   */
+  buildDir?: string
   /** Explicit mount-point configuration applied after the child's own configuration. */
   overrides?: AppOverrides
 }

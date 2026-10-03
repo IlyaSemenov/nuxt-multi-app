@@ -1,9 +1,9 @@
-import { existsSync, realpathSync } from "node:fs"
-import { resolve } from "node:path"
+import { existsSync, lstatSync, readlinkSync, realpathSync } from "node:fs"
+import { basename, dirname, join, resolve } from "node:path"
 
 import type { Nuxt } from "nuxt/schema"
 
-import { appDir, moduleBuildDir } from "./layout"
+import { mountedBuildDir } from "./layout"
 import { logger } from "./logger"
 import type {
   AppOptions,
@@ -32,14 +32,16 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
 
   const ids = new Set([rootId])
   const roots = new Set([rootDir])
-  const rootBuildDir = resolve(nuxt.options.buildDir)
+  // The physical root build directory identifies the composition, so a symlinked checkout of the
+  // same root shares its mounted build directories instead of getting a second copy.
+  const rootBuildDir = physicalPath(nuxt.options.buildDir)
   const buildDirs = new Set([rootBuildDir])
   const apps = (options.apps ?? MODULE_DEFAULTS.apps).map((app) => {
     assertId(app.id)
     if (ids.has(app.id)) throw new Error(`nuxt-multi-app: duplicate application id ${app.id}`)
     ids.add(app.id)
 
-    const normalized = normalizeApp(app, rootDir, rootBuildDir)
+    const normalized = normalizeApp(app, rootDir, rootId, rootBuildDir)
     if (roots.has(normalized.rootDir)) {
       throw new Error(
         `nuxt-multi-app: application root is mounted more than once: ${normalized.rootDir}`,
@@ -85,6 +87,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
 function normalizeApp(
   app: AppOptions,
   rootDir: string,
+  rootId: string,
   rootBuildDir: string,
 ): NormalizedAppOptions {
   const requestedRoot = resolve(rootDir, app.rootDir)
@@ -92,13 +95,39 @@ function normalizeApp(
     throw new Error(`nuxt-multi-app: application root does not exist: ${requestedRoot}`)
   }
   const appRootDir = realpathSync(requestedRoot)
+  const buildDir = physicalPath(
+    app.buildDir
+      ? resolve(rootDir, app.buildDir)
+      : mountedBuildDir(appRootDir, rootId, rootBuildDir),
+  )
+  // The child's standalone Nuxt clears this directory on every run of its own.
+  if (buildDir === physicalPath(resolve(appRootDir, ".nuxt"))) {
+    throw new Error(
+      `nuxt-multi-app: buildDir of ${app.id} is the standalone build directory of the application`,
+    )
+  }
   return {
     id: app.id,
     rootDir: appRootDir,
     overrides: app.overrides ?? {},
-    buildDir: appDir(moduleBuildDir(rootBuildDir), app.id),
+    buildDir,
     isRoot: false,
   }
+}
+
+/**
+ * Resolve every symlink in an absolute path whose tail may not exist yet, so that two spellings
+ * of one directory compare equal before it is created.
+ */
+function physicalPath(path: string, depth = 0): string {
+  if (existsSync(path)) return realpathSync(path)
+  const parent = dirname(path)
+  if (parent === path) return path
+  const entry = join(physicalPath(parent, depth), basename(path))
+  // A dangling symlink already names the directory it will point to.
+  if (!lstatSync(entry, { throwIfNoEntry: false })?.isSymbolicLink()) return entry
+  if (depth >= 40) throw new Error(`nuxt-multi-app: too many symbolic links in ${path}`)
+  return physicalPath(resolve(dirname(entry), readlinkSync(entry)), depth + 1)
 }
 
 function assertId(id: string) {
