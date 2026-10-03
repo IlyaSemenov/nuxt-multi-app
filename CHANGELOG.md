@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.7.0
+
+### Minor Changes
+
+- 1a3fd26: Move mounted child build directories into the child's tree and add `apps[].buildDir` to customize their location.
+
 ## 0.6.0
 
 ### Minor Changes
