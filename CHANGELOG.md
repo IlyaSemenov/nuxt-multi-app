@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.8.0
+
+### Minor Changes
+
+- 68fe768: Add `forwardResponseHeaders` to `createFetch` to copy selected target response headers, such as `Set-Cookie`, to the response of the incoming request.
+
 ## 0.7.0
 
 ### Minor Changes
