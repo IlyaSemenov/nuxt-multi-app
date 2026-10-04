@@ -1,4 +1,4 @@
-import { request as nodeRequest } from "node:http"
+import { request as nodeRequest, type ServerResponse } from "node:http"
 import { Readable } from "node:stream"
 
 import type { NitroRuntime } from "./contract"
@@ -12,6 +12,12 @@ import type {
 export type GatewayAddress = { socketPath: string } | { host: string; port: number }
 
 type IncomingHeaders = Readonly<Record<string, string | string[] | undefined>>
+
+/**
+ * Response of the incoming request that forwarded headers are written to.
+ * Nitro serves internal requests with a stand-in object that implements only these methods.
+ */
+export type IncomingResponse = Pick<ServerResponse, "getHeader" | "setHeader">
 
 /** Create a dispatcher for one Nitro development worker. */
 export function createDevDispatch(
@@ -34,17 +40,22 @@ export function createFetchFactory(
   dispatch: NuxtMultiAppDispatch,
   requestSignal: AbortSignal,
   incomingHeaders: IncomingHeaders = {},
+  incomingResponse?: IncomingResponse,
 ): NuxtMultiAppCreateFetch {
-  return (targetId, options) => (input, init) => {
+  return (targetId, options) => async (input, init) => {
     const request = inheritRequestHeaders(
       new Request(input, init),
       incomingHeaders,
       options?.inheritRequestHeaders,
     )
-    return dispatch(targetId, request, {
+    const response = await dispatch(targetId, request, {
       // The normalized request follows either `input.signal` or an overriding `init.signal`.
       signal: mergeSignals(requestSignal, options?.signal, request.signal),
     })
+    if (incomingResponse) {
+      forwardResponseHeaders(response, options?.forwardResponseHeaders, incomingResponse)
+    }
+    return response
   }
 }
 
@@ -67,6 +78,30 @@ function inheritRequestHeaders(
     )
   }
   return new Request(request, { headers })
+}
+
+/** Write allowlisted target response headers to the incoming response. */
+function forwardResponseHeaders(
+  response: Response,
+  names: readonly string[] | undefined,
+  incoming: IncomingResponse,
+) {
+  for (const name of names ?? []) {
+    if (name.toLowerCase() === "set-cookie") {
+      // Set-Cookie is the one header sent as separate lines, so cookies accumulate.
+      // `Headers.get()` would join them into one invalid value.
+      const cookies = response.headers.getSetCookie()
+      if (!cookies.length) continue
+      const current = incoming.getHeader(name)
+      const previous =
+        current === undefined ? [] : Array.isArray(current) ? current : [String(current)]
+      incoming.setHeader(name, [...previous, ...cookies])
+    } else {
+      // A repeated single-value header is invalid, so the target's value replaces the current one.
+      const value = response.headers.get(name)
+      if (value !== null) incoming.setHeader(name, value)
+    }
+  }
 }
 
 function mergeSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {

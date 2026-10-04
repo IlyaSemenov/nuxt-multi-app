@@ -236,6 +236,26 @@ The allowlist is empty by default, including for sensitive headers such as `auth
 The final `Request` follows the standard Fetch API precedence for `Request` and `RequestInit`, and an explicitly present header, including an empty value, prevents inheritance.
 The application ID still selects the target; an inherited Host header is request data available to that application's middleware and routes.
 
+Use `forwardResponseHeaders` when the caller consumes the target's response itself, for example while rendering a page, and selected headers of that response must still reach the browser:
+
+```ts
+export default defineEventHandler(async (event) => {
+  const fetch = event.context.nuxtMultiApp.createFetch("tenant", {
+    inheritRequestHeaders: ["cookie"],
+    forwardResponseHeaders: ["set-cookie"],
+  })
+  const response = await fetch(new URL("/api/session", getRequestURL(event)))
+  // Cookies the target set are already on this handler's response.
+  return { session: await response.json() }
+})
+```
+
+The allowlist is empty by default.
+Each `Set-Cookie` value of the target is added to the cookies already set on the incoming response, while any other forwarded header replaces the current value.
+The caller still receives the complete response, and headers can be forwarded only before the incoming response has started.
+
+Do not forward headers of a response that the handler returns as is: h3 copies the headers of a returned `Response` itself, so forwarded cookies would be sent twice.
+
 In development the call crosses a private local socket; in production it reaches the target's Nitro handler inside the same process.
 
 Both live on the server event, so neither reaches the browser.

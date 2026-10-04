@@ -1,5 +1,5 @@
 import type { Buffer } from "node:buffer"
-import type { IncomingMessage } from "node:http"
+import type { IncomingMessage, ServerResponse } from "node:http"
 import type { Duplex } from "node:stream"
 
 import type { RoutingRule } from "./routing"
@@ -13,7 +13,8 @@ export interface NitroEvent {
   context: Record<string, unknown>
   node: {
     req: Pick<IncomingMessage, "headers" | "once">
-    res: NodeJS.EventEmitter & { writableEnded?: boolean }
+    res: NodeJS.EventEmitter &
+      Pick<ServerResponse, "getHeader" | "setHeader"> & { writableEnded?: boolean }
   }
 }
 

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test"
+import { IncomingMessage, ServerResponse } from "node:http"
+import { Socket } from "node:net"
 
 import { createDevDispatch, createFetchFactory, internalPath } from "./dispatch"
 import type { NuxtMultiAppDispatch } from "./types"
@@ -97,6 +99,32 @@ describe("bound fetch", () => {
     expect(dispatched?.headers.get("cookie")).toBe("session=root; tenant=acme")
     expect(dispatched?.headers.get("host")).toBe("")
     expect(dispatched?.headers.has("authorization")).toBe(false)
+  })
+
+  it("adds forwarded cookies and replaces other forwarded headers on the incoming response", async () => {
+    const dispatch: NuxtMultiAppDispatch = async () => {
+      const headers = new Headers({ "cache-control": "no-store", "x-trace": "abc" })
+      headers.append("set-cookie", "session=; Max-Age=0")
+      headers.append("set-cookie", "theme=dark")
+      return new Response("ok", { headers })
+    }
+    const incoming = new ServerResponse(new IncomingMessage(new Socket()))
+    incoming.setHeader("set-cookie", "visit=1")
+    incoming.setHeader("cache-control", "public, max-age=60")
+    const fetch = createFetchFactory(
+      dispatch,
+      new AbortController().signal,
+      {},
+      incoming,
+    )("tenant", { forwardResponseHeaders: ["Set-Cookie", "cache-control", "x-missing"] })
+
+    const response = await fetch("http://internal/api/rpc/posts")
+
+    expect(incoming.getHeaders()).toEqual({
+      "set-cookie": ["visit=1", "session=; Max-Age=0", "theme=dark"],
+      "cache-control": "no-store",
+    })
+    expect(response.headers.getSetCookie()).toEqual(["session=; Max-Age=0", "theme=dark"])
   })
 
   it("applies native RequestInit header replacement before inheritance", async () => {

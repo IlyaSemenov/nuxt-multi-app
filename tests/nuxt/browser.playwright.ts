@@ -102,6 +102,13 @@ test("isolates mounted applications and exercises their browser runtime", async 
       cookie: "session=inherited",
       body: "inherited payload",
     })
+    expect(inherited.headers()["x-owner"]).toBeUndefined()
+    expect(
+      inherited
+        .headersArray()
+        .filter(({ name }) => name.toLowerCase() === "set-cookie")
+        .map(({ value }) => value.split(";")[0]),
+    ).toEqual(["owner-a=1", "owner-b=2"])
 
     const cancelledRequest = pages[0]!.waitForEvent("requestfailed", {
       predicate: (request) => request.url() === `${origins[0]}/api/dispatch/slow`,

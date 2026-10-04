@@ -16,6 +16,11 @@ export interface NuxtMultiAppDispatchOptions {
 export interface NuxtMultiAppCreateFetchOptions extends NuxtMultiAppDispatchOptions {
   /** Incoming request headers to inherit when the final Request does not contain them. */
   inheritRequestHeaders?: readonly string[]
+  /**
+   * Target response headers to copy to the response of the incoming request.
+   * `Set-Cookie` values are added to the cookies already set, other headers replace the current value.
+   */
+  forwardResponseHeaders?: readonly string[]
 }
 
 /** Dispatch an HTTP request to a known Nuxt application in the current composition. */

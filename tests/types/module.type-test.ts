@@ -41,7 +41,10 @@ const response: Promise<Response> = context.dispatch(
   new Request("http://internal/api/rpc"),
   { signal: context.signal },
 )
-const fetchOptions: NuxtMultiAppCreateFetchOptions = { inheritRequestHeaders: ["cookie"] }
+const fetchOptions: NuxtMultiAppCreateFetchOptions = {
+  inheritRequestHeaders: ["cookie"],
+  forwardResponseHeaders: ["set-cookie"],
+}
 const boundFetch = context.createFetch("web", fetchOptions)
 // @ts-expect-error generated application IDs reject misspelled dispatch targets.
 context.dispatch("website", new Request("http://internal/api/rpc"))
