@@ -13,8 +13,61 @@ const root = resolve(import.meta.dir, "../..")
 const fixture = join(root, "tests/fixtures")
 const workspace = await mkdtemp(join(tmpdir(), "nuxt-multi-app-"))
 const portable = await mkdtemp(join(tmpdir(), "nuxt-multi-app-output-"))
+
 const nuxtVersion = process.argv[2] ?? "4.5.2"
 const hosts = { root: "landing.localhost", web: "foo.tenant.localhost" }
+
+/** Whether owned processes get their own process group, which Windows lacks. */
+const OWN_GROUP = process.platform !== "win32"
+const owned = new Set<OwnedProcess>()
+type OwnedProcess = ReturnType<typeof spawnOwned>
+
+/**
+ * Start a Nuxt CLI or server whose whole process tree the test owns: it runs in its own process
+ * group, so that its forks can be signalled with it, and whatever is left of it is killed before the
+ * workspace is removed.
+ */
+function spawnOwned(
+  command: string[],
+  options: { cwd: string; env: Record<string, string | undefined> },
+) {
+  const child = Bun.spawn(command, {
+    ...options,
+    stdout: "inherit",
+    stderr: "inherit",
+    detached: OWN_GROUP,
+  })
+  owned.add(child)
+  return child
+}
+
+/** Signal an owned process together with every process it started. */
+function signalGroup(child: OwnedProcess, signal: NodeJS.Signals) {
+  if (OWN_GROUP) process.kill(-child.pid, signal)
+  else child.kill("SIGKILL")
+}
+
+/** Whether any process of an owned process group is still running. */
+function groupRunning(child: OwnedProcess) {
+  if (!OWN_GROUP) return child.exitCode === null
+  try {
+    process.kill(-child.pid, 0)
+    return true
+  } catch (error) {
+    // macOS reports EPERM for a group whose remaining members are zombies; live members of a group
+    // the test started could always be signalled.
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === "ESRCH" || code === "EPERM") return false
+    throw error
+  }
+}
+
+async function stopOwnedProcesses() {
+  for (const child of owned) {
+    if (groupRunning(child)) signalGroup(child, "SIGKILL")
+    await child.exited
+  }
+}
 
 async function run(command: string[], cwd: string, env = process.env) {
   const child = Bun.spawn(command, { cwd, env, stdout: "inherit", stderr: "inherit" })
@@ -192,14 +245,8 @@ async function checkServer(
     NUXT_MULTI_APP_TEST_BASE: runtimeBase,
     NUXT_MULTI_APP_TEST_CHILD_STARTUP_BARRIER: mode === "development" ? childStartupBarrier : "",
   }
-  const child = Bun.spawn(command, {
-    cwd,
-    env,
-    stdout: "inherit",
-    stderr: "inherit",
-    // Own the CLI's fork as well, so a failed browser test cannot leave watchers behind.
-    detached: process.platform !== "win32",
-  })
+  // Own the CLI's fork as well, so a failed browser test cannot leave watchers behind.
+  const child = spawnOwned(command, { cwd, env })
   let stopped = false
   try {
     if (mode === "development") {
@@ -265,8 +312,7 @@ async function checkServer(
   } finally {
     if (mode === "development") await writeFile(childStartupRelease, "").catch(() => undefined)
     if (!stopped && child.exitCode === null) {
-      if (process.platform === "win32") child.kill("SIGKILL")
-      else process.kill(-child.pid, "SIGKILL")
+      signalGroup(child, "SIGKILL")
       await child.exited
     }
   }
@@ -475,23 +521,16 @@ async function assertStaticProductionRouting(cwd: string) {
 async function assertNuxtPreview(cwd: string) {
   const port = await unusedPort()
   const origin = `http://127.0.0.1:${port}`
-  const child = Bun.spawn(
+  const child = spawnOwned(
     ["node", "node_modules/nuxt/bin/nuxt.mjs", "preview", "root", "--port", String(port)],
-    {
-      cwd,
-      env: { ...process.env, HOST: "127.0.0.1", NUXT_TELEMETRY_DISABLED: "1" },
-      stdout: "inherit",
-      stderr: "inherit",
-      detached: process.platform !== "win32",
-    },
+    { cwd, env: { ...process.env, HOST: "127.0.0.1", NUXT_TELEMETRY_DISABLED: "1" } },
   )
   try {
     await waitUntilReady(origin, child)
     await assertResponse(origin, "/", hosts.root, 200, "ROOT_HMR_0")
   } finally {
     if (child.exitCode === null) {
-      if (process.platform === "win32") child.kill("SIGKILL")
-      else process.kill(-child.pid, "SIGTERM")
+      signalGroup(child, "SIGTERM")
       await child.exited
     }
   }
@@ -612,6 +651,7 @@ try {
   await assertResolverStartupFailure(["node", "output/server/index.mjs"], portable)
   await assertStaticProductionRouting(portable)
 } finally {
+  await stopOwnedProcesses()
   await rm(workspace, { recursive: true, force: true })
   await rm(portable, { recursive: true, force: true })
 }
