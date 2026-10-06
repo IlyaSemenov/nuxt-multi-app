@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.9.0
+
+### Minor Changes
+
+- 1ce475f: Fail production builds when an application's Nitro server bundle would load a different version of an external package than its code resolves to ([nitrojs/nitro#4731](https://github.com/nitrojs/nitro/issues/4731)).
+
 ## 0.8.0
 
 ### Minor Changes
