@@ -355,6 +355,32 @@ The entry listens on `NITRO_PORT` or `PORT`, default `3000`, and on `NITRO_HOST`
 
 On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active responses and dispatch calls up to `shutdownTimeout` to finish, and then closes every application.
 
+### External package versions
+
+Nitro imports external packages in the server bundle by their bare names, so when bundled code resolves one package to two installed versions, production loads one of them for all importers ([nitrojs/nitro#4731](https://github.com/nitrojs/nitro/issues/4731)).
+In a composition this happens when root code mounted into a child resolves packages from the root's directory.
+
+`nuxt build` fails when an application's server bundle imports different versions of one external package, or when its output would load another version than an import resolved to.
+Align the versions, remove the imports of the version you do not need, or bundle the package with `nitro.externals.inline`, set in `overrides` for a mounted child:
+
+```ts
+overrides: {
+  nitro: {
+    externals: {
+      inline: ["orchid-orm"]
+    }
+  }
+}
+```
+
+Bundling changes how a package loads; check packages with native add-ons or files they read at run time.
+
+The check has limits:
+
+- It compares version numbers only, so copies of one version with different patches or peer dependencies count as one package.
+- It does not see imports the bundler cannot resolve, such as `createRequire()` or computed specifiers.
+- It also counts imports that tree shaking removes, because Nitro packages their version anyway.
+
 ## Module options
 
 | Option            | Description                                           | Default          |

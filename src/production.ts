@@ -7,6 +7,7 @@ import type { NitroConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
 
 import { bundleForOutput, bundleProjectModule } from "./bundle"
+import { checkExternalVersions } from "./external-versions"
 import {
   appDir,
   PRODUCTION_ENTRY,
@@ -26,6 +27,7 @@ const serverEntry = resolver.resolve("./runtime/server.js")
 
 /** Build every application as an isolated handler and write the common production entry. */
 export function setupProductionBuild(options: NormalizedModuleOptions, root: Nuxt) {
+  checkExternalVersions(root, options.root.id, options.allApps)
   applyHandlerOutput(root.options.nitro, options.root.id)
   const rootOutput = captureNitroOutput(root, options.root.id)
   root.hook("ready", () => {
@@ -42,11 +44,7 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
       for (const app of options.apps) {
         entries.push({
           id: app.id,
-          entry: await buildChild(
-            app,
-            output.dir,
-            options.allApps.map(({ id }) => id),
-          ),
+          entry: await buildChild(app, output.dir, options.allApps),
         })
       }
       // Nitro integrations may modify the generated handler from their close hooks, so install the
@@ -67,12 +65,18 @@ interface NitroOutput {
   entry: string
 }
 
-async function buildChild(app: NormalizedAppOptions, outputDir: string, ids: string[]) {
+async function buildChild(
+  app: NormalizedAppOptions,
+  outputDir: string,
+  apps: NormalizedAppOptions[],
+) {
   const child = await loadChildNuxt(
     app,
     { type: "build", outputDir: appDir(outputDir, app.id) },
-    { ids },
+    { ids: apps.map(({ id }) => id) },
   )
+  // Register before the child becomes ready, while its Nitro instance does not exist yet.
+  checkExternalVersions(child, app.id, apps)
   applyHandlerOutput(child.options.nitro, app.id)
   const output = captureNitroOutput(child)
   await buildChildOnce(child)

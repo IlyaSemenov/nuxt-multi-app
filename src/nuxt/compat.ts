@@ -1,12 +1,17 @@
-import { dirname, resolve } from "node:path"
+import { statSync } from "node:fs"
+import { isBuiltin } from "node:module"
+import { dirname, isAbsolute, resolve } from "node:path"
 import process from "node:process"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { nuxtCtx } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
+import { resolveModuleURL } from "exsolve"
 import { toNodeListener } from "h3"
 import MagicString from "magic-string"
+import type { Nitro, RollupConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
+import type { InputPluginOption, Plugin, PluginContext, ResolvedId } from "rollup"
 import { satisfies } from "semver"
 
 import type { UpgradeHandler } from "../runtime/contract"
@@ -145,4 +150,86 @@ export function getDevHandler(nuxt: Nuxt) {
 export function getDevUpgrade(nuxt: Nuxt) {
   const server = nuxt.server as typeof nuxt.server & { upgrade?: UpgradeHandler }
   return typeof server?.upgrade === "function" ? server.upgrade.bind(server) : undefined
+}
+
+/** A package import that Nitro's production bundle leaves external. */
+export interface ExternalImport {
+  /** Bundled module that contains the import: an absolute path or a virtual module ID. */
+  importer: string
+  /** Specifier Nitro emits into the bundle in place of the import. */
+  id: string
+  /** Absolute file the specifier resolves to from the importer. */
+  file: string
+}
+
+/**
+ * Report every import that Nitro 2's private `node-externals` plugin externalizes, leaving the
+ * plugin's results unchanged.
+ *
+ * Nitro resolves the import from its importer but emits only the bare package specifier, so the
+ * importer's own resolution is captured here before it is lost.
+ * Throws when the plugin is missing or changed shape, rather than letting the caller miss imports.
+ */
+export function observeNitroExternals(
+  nitro: Nitro,
+  config: RollupConfig,
+  onImport: (entry: ExternalImport) => void,
+) {
+  const plugin = findPlugin(config.plugins, "node-externals")
+  if (!plugin || typeof plugin.resolveId !== "function") {
+    throw new TypeError(
+      "nuxt-multi-app: the Nitro node-externals plugin contract changed; external dependency versions cannot be checked",
+    )
+  }
+  const resolveId = plugin.resolveId
+  plugin.resolveId = async function (source, importer, options) {
+    let resolved: ResolvedId | null = null
+    const context: PluginContext = Object.create(this)
+    // Nitro asks the remaining resolvers for the importer's file before reducing it to a package name.
+    context.resolve = async (...args) => {
+      const result = await this.resolve(...args)
+      if (args[0] === source && args[1] === importer) resolved = result
+      return result
+    }
+    const result = await resolveId.call(context, source, importer, options)
+    // Virtual modules, such as auto-imports, are bundled too and import packages like any other module.
+    if (importer && typeof result === "object" && result?.external && !isBuiltin(result.id)) {
+      const file = importedFile(nitro, resolved, result.id, importer)
+      if (file) onImport({ importer, id: result.id, file })
+    }
+    return result
+  }
+}
+
+function findPlugin(option: InputPluginOption, name: string): Plugin | undefined {
+  if (Array.isArray(option)) {
+    for (const item of option) {
+      const plugin = findPlugin(item, name)
+      if (plugin) return plugin
+    }
+  } else if (option && !(option instanceof Promise) && option.name === name) {
+    return option
+  }
+}
+
+/** Return the file an external import loads from its importer, as Nitro itself resolves it. */
+function importedFile(nitro: Nitro, resolved: ResolvedId | null, id: string, importer: string) {
+  if (
+    resolved &&
+    isAbsolute(resolved.id) &&
+    statSync(resolved.id, { throwIfNoEntry: false })?.isFile()
+  ) {
+    return resolved.id
+  }
+  const url = resolveModuleURL(id, {
+    try: true,
+    conditions: nitro.options.exportConditions,
+    // Like Nitro, resolve imports of virtual modules from the project's module directories.
+    from: isAbsolute(importer)
+      ? [pathToFileURL(importer), ...nitro.options.nodeModulesDirs]
+      : nitro.options.nodeModulesDirs,
+    suffixes: ["", "/index"],
+    extensions: [".mjs", ".cjs", ".js", ".mts", ".cts", ".ts", ".json"],
+  })
+  return url?.startsWith("file:") ? fileURLToPath(url) : undefined
 }

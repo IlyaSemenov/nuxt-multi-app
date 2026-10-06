@@ -22,6 +22,19 @@ export default defineNuxtConfig({
             rootDir: "../web",
             overrides: {
               plugins: [fileURLToPath(new URL("./root-plugin.ts", import.meta.url))],
+              serverHandlers: [
+                {
+                  route: "/api/versions/root",
+                  handler: fileURLToPath(
+                    new URL("./server/composition/versions.ts", import.meta.url),
+                  ),
+                },
+              ],
+              // The handler above imports another version than the child; the test runner leaves this
+              // out to check that the conflict fails the production build.
+              ...(process.env.NUXT_MULTI_APP_TEST_EXTERNALS === "conflict"
+                ? {}
+                : { nitro: { externals: { inline: ["version-probe"] } } }),
             },
           },
         ],

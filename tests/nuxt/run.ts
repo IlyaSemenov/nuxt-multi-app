@@ -29,12 +29,13 @@ type OwnedProcess = ReturnType<typeof spawnOwned>
  */
 function spawnOwned(
   command: string[],
-  options: { cwd: string; env: Record<string, string | undefined> },
+  options: { cwd: string; env: Record<string, string | undefined>; output?: "inherit" | "pipe" },
 ) {
   const child = Bun.spawn(command, {
-    ...options,
-    stdout: "inherit",
-    stderr: "inherit",
+    cwd: options.cwd,
+    env: options.env,
+    stdout: options.output ?? "inherit",
+    stderr: options.output ?? "inherit",
     detached: OWN_GROUP,
   })
   owned.add(child)
@@ -66,6 +67,19 @@ async function stopOwnedProcesses() {
   for (const child of owned) {
     if (groupRunning(child)) signalGroup(child, "SIGKILL")
     await child.exited
+  }
+}
+
+/** Wait for a result with a deadline, so a hung process fails instead of passing as an exit code. */
+async function within<T>(result: Promise<T>, timeout: number, description: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${description}: timed out`)), timeout)
+  })
+  try {
+    return await Promise.race([result, deadline])
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -191,6 +205,67 @@ async function assertBackpressure(origin: string) {
   assert.equal(result.producedAfterComplete, 64)
 }
 
+/** Each application, and the root code mounted into the child, loads the version it resolves. */
+async function assertPackageVersions(origin: string) {
+  for (const [host, path, version] of [
+    [hosts.root, "/api/versions", "2.0.0"],
+    [hosts.web, "/api/versions/child", "1.0.0"],
+    [hosts.web, "/api/versions/root", "2.0.0"],
+  ] as const) {
+    const response = await request(origin, path, host)
+    assert.deepEqual(await response.json(), { version }, `${host}${path}`)
+  }
+}
+
+/**
+ * Build without the child's inline override: the root code mounted into the child imports another
+ * version of a package than the child, so the version check must fail the build once and exit.
+ */
+async function assertExternalVersionConflict(cwd: string) {
+  const child = spawnOwned(["node", "node_modules/nuxt/bin/nuxt.mjs", "build", "root"], {
+    cwd,
+    env: {
+      ...process.env,
+      NUXT_TELEMETRY_DISABLED: "1",
+      NUXT_MULTI_APP_TEST_EXTERNALS: "conflict",
+    },
+    output: "pipe",
+  })
+  // A leftover process keeps the output streams open, so the deadline covers reading them too.
+  const [exitCode, ...output] = await within(
+    Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]),
+    300_000,
+    "The conflicting build did not finish",
+  )
+  assert(!groupRunning(child), "The failed build left processes running")
+  // oxlint-disable-next-line no-control-regex
+  const text = output.join("\n").replace(/\x1b\[[0-9;]*m/g, "")
+  assert.notEqual(exitCode, 0, "The build accepted conflicting external package versions")
+  assert.equal(
+    text.split('App "web" bundles imports that resolve to different versions').length - 1,
+    1,
+    text,
+  )
+  assert(
+    text.includes(
+      [
+        "version-probe",
+        "  1.0.0",
+        '    "version-probe" -> node_modules/version-probe/index.js',
+        "      from server/api/versions/child.get.ts",
+        "  2.0.0",
+        '    "version-probe" -> [root] node_modules/version-probe/index.js',
+        "      from [root] server/composition/versions.ts",
+      ].join("\n"),
+    ),
+    text,
+  )
+}
+
 async function assertProductionShutdown(origin: string, server: ReturnType<typeof Bun.spawn>) {
   const active = request(origin, "/api/dispatch/slow", hosts.root)
     .then((response) => response.text())
@@ -244,6 +319,8 @@ async function checkServer(
     NUXT_MULTI_APP_TEST_RESOLVER_OUTPUT: resolverOutput,
     NUXT_MULTI_APP_TEST_BASE: runtimeBase,
     NUXT_MULTI_APP_TEST_CHILD_STARTUP_BARRIER: mode === "development" ? childStartupBarrier : "",
+    // Development keeps every importer's package version without the production inline override.
+    NUXT_MULTI_APP_TEST_EXTERNALS: mode === "development" ? "conflict" : "",
   }
   // Own the CLI's fork as well, so a failed browser test cannot leave watchers behind.
   const child = spawnOwned(command, { cwd, env })
@@ -297,6 +374,7 @@ async function checkServer(
     assert.equal(unmatched.headers.get("x-nuxt-multi-app-test-fallback"), "unmatched")
     await assertWebSocket(port)
     await assertBackpressure(origin)
+    await assertPackageVersions(origin)
     if (mode !== "portable") await runBrowser(workspace, port, mode)
 
     if (mode === "production") {
@@ -584,8 +662,13 @@ try {
   )
   await run(["bun", "install", "--ignore-scripts"], workspace)
   await installChildOnlyDependency()
+  await installVersionProbes()
   await run(["bun", "run", "nuxt", "prepare", "web"], workspace)
-  await run(["bun", "run", "nuxt", "prepare", "root"], workspace)
+  // Preparing types does not build bundles, so conflicting package versions do not stop it.
+  await run(["bun", "run", "nuxt", "prepare", "root"], workspace, {
+    ...process.env,
+    NUXT_MULTI_APP_TEST_EXTERNALS: "conflict",
+  })
   const typecheckConfig = join(workspace, "root/.nuxt/tsconfig.multi-app.json")
   const typecheckSolution = JSON.parse(await readFile(typecheckConfig, "utf8"))
   const webBuildDir = await mountedWebBuildDir(workspace)
@@ -650,6 +733,7 @@ try {
   await checkServer(["node", "output/server/index.mjs"], portable, "portable")
   await assertResolverStartupFailure(["node", "output/server/index.mjs"], portable)
   await assertStaticProductionRouting(portable)
+  await assertExternalVersionConflict(workspace)
 } finally {
   await stopOwnedProcesses()
   await rm(workspace, { recursive: true, force: true })
@@ -674,6 +758,29 @@ async function installChildOnlyDependency() {
     join(packageDir, "index.d.ts"),
     "export interface ChildOnlyProps {\n  label: string\n}\n",
   )
+}
+
+/**
+ * Install separate versions of one package for the root and the child, as when they are installed
+ * separately; the root also mounts code into the child that imports its own version.
+ */
+async function installVersionProbes() {
+  for (const [app, version] of [
+    ["root", "2.0.0"],
+    ["web", "1.0.0"],
+  ] as const) {
+    const packageDir = join(workspace, app, "node_modules/version-probe")
+    await mkdir(packageDir, { recursive: true })
+    await writeFile(
+      join(packageDir, "package.json"),
+      JSON.stringify({ name: "version-probe", version, type: "module", exports: "./index.js" }),
+    )
+    await writeFile(
+      join(packageDir, "index.js"),
+      `export const version = ${JSON.stringify(version)}\n`,
+    )
+    await writeFile(join(packageDir, "index.d.ts"), "export declare const version: string\n")
+  }
 }
 
 /**
