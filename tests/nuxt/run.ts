@@ -63,6 +63,23 @@ function groupRunning(child: OwnedProcess) {
   }
 }
 
+/**
+ * Fail unless every process of an owned group is gone shortly after its leader exited. Orphaned
+ * descendants may still be exiting, and Linux counts them while they wait for init to reap them.
+ */
+async function assertGroupStopped(child: OwnedProcess, message: string) {
+  // Without process groups there is nothing left to check once the child itself has exited.
+  if (!OWN_GROUP) return
+  const deadline = Date.now() + 5_000
+  while (groupRunning(child) && Date.now() < deadline) await Bun.sleep(50)
+  if (!groupRunning(child)) return
+  const processes = Bun.spawnSync(["ps", "-eo", "pid=,pgid=,stat=,args="]).stdout.toString()
+  const left = processes
+    .split("\n")
+    .filter((line) => line.trim().split(/\s+/)[1] === String(child.pid))
+  assert.fail(`${message}:\n${left.join("\n")}`)
+}
+
 async function stopOwnedProcesses() {
   for (const child of owned) {
     if (groupRunning(child)) signalGroup(child, "SIGKILL")
@@ -241,7 +258,7 @@ async function assertExternalVersionConflict(cwd: string) {
     300_000,
     "The conflicting build did not finish",
   )
-  assert(!groupRunning(child), "The failed build left processes running")
+  await assertGroupStopped(child, "The failed build left processes running")
   // oxlint-disable-next-line no-control-regex
   const text = output.join("\n").replace(/\x1b\[[0-9;]*m/g, "")
   assert.notEqual(exitCode, 0, "The build accepted conflicting external package versions")
