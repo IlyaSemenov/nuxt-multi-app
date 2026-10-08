@@ -8,9 +8,12 @@ import process from "node:process"
 
 import { logger } from "../logger"
 import type { GatewayAddress } from "../runtime/dispatch"
+import { WORKER_PROBE_HEADER } from "../runtime/worker-probe"
 
 export interface GatewayTarget {
   handle: RequestListener
+  /** Serve a worker probe while the target is still loading, bypassing its wait for the load. */
+  probe?: RequestListener
 }
 
 interface GatewayOptions {
@@ -35,9 +38,12 @@ export function createGateway(
       return
     }
     const id = request.headers["x-nuxt-multi-app-target"]
+    const probe = request.headers[WORKER_PROBE_HEADER] === token
     // Gateway credentials and addressing are transport metadata, never application headers.
     delete request.headers["x-nuxt-multi-app-token"]
     delete request.headers["x-nuxt-multi-app-target"]
+    // Only an authenticated probe carries its credential through to the worker's early handler.
+    if (!probe) delete request.headers[WORKER_PROBE_HEADER]
     const target = typeof id === "string" ? getTarget(id) : undefined
     if (typeof id !== "string" || !target) {
       response.statusCode = 500
@@ -54,7 +60,13 @@ export function createGateway(
     }
     response.once("finish", release)
     response.once("close", release)
-    Promise.resolve(target.handle(request, response)).catch((error) => {
+    const listener = probe ? target.probe : target.handle
+    if (!listener) {
+      response.statusCode = 404
+      response.end("Unknown nuxt-multi-app probe target")
+      return
+    }
+    Promise.resolve(listener(request, response)).catch((error) => {
       logger.withTag(id).error(error)
       if (response.headersSent) response.destroy(error as Error)
       else {

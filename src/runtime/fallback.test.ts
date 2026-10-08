@@ -30,15 +30,13 @@ describe("default fallback responses", () => {
     })
   })
 
-  for (const type of ["starting", "closing"] as const) {
-    it(`renders an application that is ${type}`, () => {
-      expect(render({ type, appId: "web" })).toEqual({
-        status: 503,
-        headers: new Map([["retry-after", "1"]]),
-        body: `Nuxt application web is ${type}`,
-      })
+  it("renders an application that is closing", () => {
+    expect(render({ type: "closing", appId: "web" })).toEqual({
+      status: 503,
+      headers: new Map([["retry-after", "1"]]),
+      body: "Nuxt application web is closing",
     })
-  }
+  })
 
   it("renders an application startup failure", () => {
     expect(render({ type: "failed", appId: "web", error: new Error("failed") })).toEqual({

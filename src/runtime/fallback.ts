@@ -3,7 +3,6 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 /** Why no application can serve a request, passed to the fallback. */
 export type MultiAppFallbackReason =
   | { type: "unmatched"; host: string }
-  | { type: "starting"; appId: string }
   | { type: "closing"; appId: string }
   | { type: "failed"; appId: string; error: unknown }
   | { type: "resolver-error"; error: unknown }
@@ -28,10 +27,10 @@ export const defaultFallback: MultiAppFallback = (reason, _request, response) =>
     response.end("No Nuxt application matches this request")
     return
   }
-  if (reason.type === "starting" || reason.type === "closing") {
+  if (reason.type === "closing") {
     response.statusCode = 503
     response.setHeader("retry-after", "1")
-    response.end(`Nuxt application ${reason.appId} is ${reason.type}`)
+    response.end(`Nuxt application ${reason.appId} is closing`)
     return
   }
   response.statusCode = 500

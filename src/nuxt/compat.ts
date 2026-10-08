@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { nuxtCtx } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
 import { resolveModuleURL } from "exsolve"
-import { toNodeListener } from "h3"
+import { createApp, createError, defineEventHandler, toNodeListener } from "h3"
 import MagicString from "magic-string"
 import type { Nitro, RollupConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
@@ -144,6 +144,31 @@ export function getDevHandler(nuxt: Nuxt) {
     throw new Error("nuxt-multi-app: Nitro 2 development app is missing")
   }
   return toNodeListener(nuxt.server.app)
+}
+
+/** Return Nitro 2's worker proxy without the development middleware, assets or user proxies. */
+export function getDevWorkerHandler(nuxt: Nuxt) {
+  if (!nuxt.server || !("app" in nuxt.server)) {
+    throw new Error("nuxt-multi-app: Nitro 2 development app is missing")
+  }
+  // Nitro appends its worker proxy last. A probe must reach that layer even when a dev handler
+  // intercepts every URL; reaching application code is not a prerequisite for worker readiness.
+  const proxy = nuxt.server.app.stack.at(-1)
+  if (!proxy || proxy.route !== "/" || proxy.match) {
+    throw new Error("nuxt-multi-app: Nitro 2 development worker proxy is missing")
+  }
+  return toNodeListener(
+    createApp().use(
+      defineEventHandler(async (event) => {
+        const result = await proxy.handler(event)
+        // Nitro returns startup exceptions separately from its temporary unavailable Response.
+        // An exception carrying 503 is a failed worker, not a reason to keep waiting for it.
+        return result instanceof Error
+          ? createError({ statusCode: 500, message: result.message, cause: result })
+          : result
+      }),
+    ),
+  )
 }
 
 /** Return Nitro's application WebSocket upgrade handler when it is available. */

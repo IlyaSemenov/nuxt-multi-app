@@ -212,7 +212,8 @@ Nothing is forwarded implicitly.
 Cookies, authorization, tracing, and the original Host header travel only when you set them on the outgoing request.
 
 - An unknown ID throws.
-- A target that cannot take the call answers 503 with `Retry-After: 1`: in development while it is still booting, in production only during shutdown.
+- A call to an application that is still loading in development waits until it loads.
+- A target that is shutting down answers 503 with `Retry-After: 1`.
 - The call is cancelled when its signal aborts or the server starts shutting down.
 
 Use `createFetch(id, options?)` when the caller is a client library configured with a `fetch` function: it builds the `Request` for you and dispatches it to that application.
@@ -282,7 +283,7 @@ Set `multiApp.debug` to add a per-application breakdown to the body.
 
 When no application can serve a request, the module answers it with a fallback response.
 When no routing rule selects an application, the built-in response is 404; a resolver failure produces 500.
-Development adds 503 while an application is still booting and 500 after one has failed.
+Development adds 500 after an application has failed to load and 503 while one is shutting down.
 
 Set `fallback` to replace those responses with your own:
 
@@ -309,7 +310,6 @@ The fallback returned by the factory receives one of these reasons:
 
 - `unmatched`: no application matched the request;
 - `resolver-error`: the resolver threw;
-- `starting`: the application is still loading (development only);
 - `closing`: the application is shutting down (development only);
 - `failed`: the application failed to load (development only).
 
@@ -322,6 +322,7 @@ npx nuxt dev apps/landing
 ```
 
 Each application gets its own Vite and Nitro instance, and serves its own pages, server routes, and HMR.
+Requests and dispatches to an application that is still starting wait until it is ready.
 Editing a child's `nuxt.config` restarts every mounted application.
 
 Vite checks hostnames after routing, not before.

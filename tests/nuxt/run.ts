@@ -308,6 +308,155 @@ async function assertProductionShutdown(origin: string, server: ReturnType<typeo
   await active
 }
 
+/** Worker startup errors, including 503 errors, fail held requests and recover on a fixed build. */
+async function assertWorkerStartupFailure() {
+  const port = await unusedPort()
+  const origin = `http://127.0.0.1:${port}`
+  const plugin = join(workspace, "startup/web/server/plugins/failure.ts")
+  const source = await readFile(plugin, "utf8")
+  const requests = join(workspace, "failed-worker-requests.log")
+  await writeFile(requests, "")
+  const child = spawnOwned(
+    ["node", "node_modules/nuxt/bin/nuxt.mjs", "dev", "startup/root", "--host", "127.0.0.1"],
+    {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        HOST: "127.0.0.1",
+        PORT: String(port),
+        NUXT_TELEMETRY_DISABLED: "1",
+        NUXT_MULTI_APP_TEST_WORKER_FAILURE: "1",
+        NUXT_MULTI_APP_TEST_REQUESTS: requests,
+      },
+    },
+  )
+  try {
+    await waitUntil(
+      child,
+      async () => (await fetch(`${origin}/ready`)).status === 503,
+      "Listener did not start",
+    )
+    const pending = fetch(`${origin}/probe/page`, { headers: { "x-test-client": "1" } })
+    const failed = await within(pending, 30_000, "Request held for a crashed worker")
+    assert.equal(failed.status, 500)
+    assert.equal(await failed.text(), "Nuxt application web failed to start")
+    assert.equal((await (await fetch(`${origin}/ready`)).json()).apps.web, "failed")
+    assert.equal(await readFile(requests, "utf8"), "")
+
+    await writeFile(plugin, "export default defineNitroPlugin(() => {})\n")
+    await waitUntil(
+      child,
+      async () => (await fetch(`${origin}/ready`)).ok,
+      "Fixed worker did not recover",
+    )
+    const recovered = await fetch(`${origin}/probe/page`, { headers: { "x-test-client": "1" } })
+    assert.equal(recovered.status, 200)
+    assert.equal(await recovered.text(), "wildcard:api")
+  } finally {
+    if (child.exitCode === null) child.kill("SIGINT")
+    assert.equal(await within(child.exited, 15_000, "Failed worker fixture shutdown"), 0)
+    await assertGroupStopped(child, "Failed worker fixture left processes running")
+    await writeFile(plugin, source)
+  }
+}
+
+/** Worker readiness neither executes application code nor blocks loading the next child. */
+async function assertIndependentStartup(stopWhileStarting = false) {
+  const port = await unusedPort()
+  const origin = `http://127.0.0.1:${port}`
+  const barrier = join(workspace, stopWhileStarting ? "closing-worker" : "independent-worker")
+  const requests = join(workspace, "startup-requests.log")
+  await writeFile(requests, "")
+  const child = spawnOwned(
+    ["node", "node_modules/nuxt/bin/nuxt.mjs", "dev", "startup/root", "--host", "127.0.0.1"],
+    {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        HOST: "127.0.0.1",
+        PORT: String(port),
+        NUXT_TELEMETRY_DISABLED: "1",
+        NUXT_MULTI_APP_TEST_WORKER_STARTUP_BARRIER: barrier,
+        NUXT_MULTI_APP_TEST_REQUESTS: requests,
+        NUXT_MULTI_APP_TEST_CLOSING_REQUEST: `${barrier}.request`,
+      },
+    },
+  )
+  let stopping = false
+  try {
+    await waitUntil(child, () => Bun.file(`${barrier}.waiting`).exists(), "Worker did not pause")
+    await waitUntil(
+      child,
+      async () => (await fetch(`${origin}/api/backend`, { signal: AbortSignal.timeout(1_000) })).ok,
+      "The second child did not start while the first worker was paused",
+    )
+    const readiness = await (await fetch(`${origin}/ready`)).json()
+    assert.deepEqual(readiness.apps, { root: "ready", web: "starting", api: "ready" })
+    const pending = fetch(`${origin}/probe/${stopWhileStarting ? "closing" : "page"}`, {
+      headers: { "x-test-client": "1" },
+    })
+    if (stopWhileStarting) {
+      // The CLI may close its public listener before the child can send the closing fallback.
+      const settled = pending.catch((error: NodeJS.ErrnoException) => {
+        assert.ok(
+          ["ConnectionRefused", "ConnectionClosed", "ECONNRESET"].includes(error.code ?? ""),
+        )
+      })
+      await waitUntil(
+        child,
+        () => Bun.file(`${barrier}.request`).exists(),
+        "Request did not reach routing",
+      )
+      stopping = true
+      child.kill("SIGINT")
+      const response = await within(settled, 5_000, "Request held during shutdown")
+      if (response) {
+        assert.equal(response.status, 503)
+        assert.equal(await response.text(), "Nuxt application web is closing")
+      }
+      assert.equal(await readFile(requests, "utf8"), "", "Shutdown ran application middleware")
+      return
+    }
+    await writeFile(`${barrier}.release`, "")
+    const page = await within(pending, 30_000, "Request held for the first worker")
+    assert.equal(page.status, 200)
+    assert.equal(await page.text(), "wildcard:api")
+    assert.equal(
+      await readFile(requests, "utf8"),
+      "/probe/page\n",
+      "Readiness ran application middleware",
+    )
+
+    const legacyPath = await fetch(`${origin}/__nuxt_multi_app/worker`, {
+      headers: { "x-test-client": "1", "x-nuxt-multi-app-probe": "1" },
+    })
+    assert.equal(legacyPath.status, 200)
+    assert.equal(
+      await legacyPath.text(),
+      "wildcard:api",
+      "An internal probe reserved a public route",
+    )
+    const devFailure = await fetch(`${origin}/probe/page`)
+    assert.equal(devFailure.status, 503)
+    assert.equal(await devFailure.text(), "development middleware")
+    const workerFailure = await fetch(`${origin}/probe/page`, {
+      headers: { "x-test-client": "unavailable" },
+    })
+    assert.equal(workerFailure.status, 503)
+    assert.equal(await workerFailure.text(), "worker middleware")
+    assert.equal((await fetch(`${origin}/ready`)).status, 200)
+    assert.equal(
+      await readFile(requests, "utf8"),
+      "/probe/page\n/__nuxt_multi_app/worker\n/probe/page\n",
+    )
+  } finally {
+    await writeFile(`${barrier}.release`, "")
+    if (!stopping && child.exitCode === null) child.kill("SIGINT")
+    assert.equal(await within(child.exited, 15_000, "Startup fixture shutdown"), 0)
+    await assertGroupStopped(child, "Startup fixture left processes running")
+  }
+}
+
 async function checkServer(
   command: string[],
   cwd: string,
@@ -319,13 +468,24 @@ async function checkServer(
   const childStartupBarrier = join(workspace, `child-startup-${mode}`)
   const childStartupWaiting = `${childStartupBarrier}.waiting`
   const childStartupRelease = `${childStartupBarrier}.release`
+  const workerStartupBarrier = join(workspace, `worker-startup-${mode}`)
+  const workerStartupWaiting = `${workerStartupBarrier}.waiting`
+  const workerStartupRelease = `${workerStartupBarrier}.release`
+  const compileProbe = join(cwd, "web/server/api/compile-probe.get.ts")
   const runtimeBase =
     mode === "production" ? "runtime-a.localhost" : mode === "portable" ? "runtime-b.localhost" : ""
   await Promise.all(
-    [resolverOutput, childStartupWaiting, childStartupRelease].map((path) =>
-      rm(path, { force: true }),
-    ),
+    [
+      resolverOutput,
+      childStartupWaiting,
+      childStartupRelease,
+      workerStartupWaiting,
+      workerStartupRelease,
+    ].map((path) => rm(path, { force: true })),
   )
+  // The first development compilation of the child fails until the test fixes this route.
+  if (mode === "development")
+    await writeFile(compileProbe, "export default defineEventHandler(() => {\n")
   const env = {
     ...process.env,
     HOST: "127.0.0.1",
@@ -336,6 +496,7 @@ async function checkServer(
     NUXT_MULTI_APP_TEST_RESOLVER_OUTPUT: resolverOutput,
     NUXT_MULTI_APP_TEST_BASE: runtimeBase,
     NUXT_MULTI_APP_TEST_CHILD_STARTUP_BARRIER: mode === "development" ? childStartupBarrier : "",
+    NUXT_MULTI_APP_TEST_WORKER_STARTUP_BARRIER: mode === "development" ? workerStartupBarrier : "",
     // Development keeps every importer's package version without the production inline override.
     NUXT_MULTI_APP_TEST_EXTERNALS: mode === "development" ? "conflict" : "",
   }
@@ -354,9 +515,73 @@ async function checkServer(
         async () => (await request(origin, "/", hosts.root)).status === 200,
         "Listener owner did not become ready",
       )
-      const starting = await request(origin, "/api/dispatch", hosts.root)
-      assert.equal(starting.status, 503, "Dispatch did not expose a starting backend as 503")
+      // Requests to a loading application are held rather than answered with a fallback.
+      const startingDispatch = request(origin, "/api/dispatch", hosts.root)
+      const startingPage = request(origin, "/", hosts.web)
+      const early = await Promise.race([
+        ...[startingDispatch, startingPage].map((response) => response.then(() => "answered")),
+        Bun.sleep(500).then(() => "pending"),
+      ])
+      assert.equal(early, "pending", "A loading application answered before it finished loading")
       await writeFile(childStartupRelease, "")
+      // A failed first compilation answers the held requests with the failure instead of leaving them waiting.
+      const failed = await within(
+        Promise.all([startingDispatch, startingPage]),
+        60_000,
+        "Requests held during startup",
+      )
+      for (const response of failed) {
+        assert.equal(
+          response.status,
+          500,
+          "A failed first compilation did not answer held requests",
+        )
+        assert.equal(response.headers.get("x-nuxt-multi-app-test-fallback"), "failed")
+      }
+      // Fixing the sources resumes loading, and requests wait for the worker, not only for the build.
+      // Rewrite the fix until it is picked up: the watcher may not observe a change made right after the failure.
+      let fixes = 0
+      let fixedAt = 0
+      await waitUntil(
+        child,
+        async () => {
+          if (await Bun.file(workerStartupWaiting).exists()) return true
+          if (Date.now() - fixedAt >= 2_000) {
+            await writeFile(
+              compileProbe,
+              `export default defineEventHandler(() => "compiled ${++fixes}")\n`,
+            )
+            fixedAt = Date.now()
+          }
+          return false
+        },
+        "Mounted child did not reach its worker startup barrier",
+      )
+      const workerDispatch = request(origin, "/api/dispatch", hosts.root)
+      const workerPage = request(origin, "/", hosts.web)
+      const answeredBeforeWorker = await Promise.race([
+        ...[workerDispatch, workerPage].map((response) => response.then(() => "answered")),
+        // Longer than Nitro waits for a worker before answering 503 by itself.
+        Bun.sleep(7_000).then(() => "pending"),
+      ])
+      assert.equal(
+        answeredBeforeWorker,
+        "pending",
+        "A request was answered before the worker initialized",
+      )
+      await writeFile(workerStartupRelease, "")
+      const [dispatchAfterStart, pageAfterStart] = await Promise.all([workerDispatch, workerPage])
+      assert.equal(
+        dispatchAfterStart.status,
+        200,
+        "Dispatch held during startup did not reach its target",
+      )
+      assert.equal((await dispatchAfterStart.json()).app, "web")
+      assert.equal(
+        pageAfterStart.status,
+        200,
+        "Request held during startup did not reach its target",
+      )
     }
     await waitUntilReady(origin, child)
     assert.deepEqual((await readFile(resolverOutput, "utf8")).trim().split("\n"), [
@@ -405,7 +630,10 @@ async function checkServer(
       await assertIpcStopped(snapshots)
     }
   } finally {
-    if (mode === "development") await writeFile(childStartupRelease, "").catch(() => undefined)
+    if (mode === "development") {
+      await writeFile(childStartupRelease, "").catch(() => undefined)
+      await writeFile(workerStartupRelease, "").catch(() => undefined)
+    }
     if (!stopped && child.exitCode === null) {
       signalGroup(child, "SIGKILL")
       await child.exited
@@ -713,6 +941,9 @@ try {
     ["node", "node_modules/nuxt/bin/nuxt.mjs", "dev", "root", "--host", "127.0.0.1"],
     workspace,
   )
+  await assertWorkerStartupFailure()
+  await assertIndependentStartup()
+  await assertIndependentStartup(true)
   await checkServer(
     ["node", "node_modules/nuxt/bin/nuxt.mjs", "dev", "root", "--host", "127.0.0.1"],
     workspace,

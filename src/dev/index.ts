@@ -97,6 +97,7 @@ async function loadDevModules(options: NormalizedModuleOptions, nuxt: Nuxt) {
 }
 
 async function startChildren(children: Child[], server: Server) {
+  // Serialize Nuxt loads; each child's worker readiness completes independently afterwards.
   for (const child of children) {
     try {
       await child.start(server)

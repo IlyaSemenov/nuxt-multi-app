@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import { logger } from "../logger"
 import { gatewayFetch } from "../runtime/dispatch"
+import { WORKER_PROBE_HEADER } from "../runtime/worker-probe"
 import { createGateway } from "./gateway"
 
 describe("development dispatch gateway", () => {
@@ -34,6 +35,56 @@ describe("development dispatch gateway", () => {
         }),
       )
       expect(await response.json()).toEqual({ path: "/marker?q=1", host: "tenant.example" })
+    } finally {
+      await gateway.close(1_000)
+    }
+  })
+
+  it("routes worker probes to the target's probe listener", async () => {
+    const gateway = createGateway((id) =>
+      id === "web"
+        ? {
+            handle(_request, response) {
+              response.end("handled")
+            },
+            probe(request, response) {
+              response.end(
+                request.headers[WORKER_PROBE_HEADER] === gateway.token
+                  ? "probed"
+                  : "unauthenticated",
+              )
+            },
+          }
+        : id === "root"
+          ? {
+              handle(_request, response) {
+                response.end("handled")
+              },
+            }
+          : undefined,
+    )
+    try {
+      const address = await gateway.listen()
+      const probe = (id: string) =>
+        gatewayFetch(
+          address,
+          gateway.token,
+          id,
+          new Request("http://ignored.example/", {
+            headers: { [WORKER_PROBE_HEADER]: gateway.token },
+          }),
+        )
+      expect(await (await probe("web")).text()).toBe("probed")
+      expect((await probe("root")).status).toBe(404)
+      const ordinary = await gatewayFetch(
+        address,
+        gateway.token,
+        "web",
+        new Request("http://ignored.example/", {
+          headers: { [WORKER_PROBE_HEADER]: "1" },
+        }),
+      )
+      expect(await ordinary.text()).toBe("handled")
     } finally {
       await gateway.close(1_000)
     }

@@ -18,6 +18,8 @@ export interface DevEndpoint {
   readonly id: string
   readonly state: DevEndpointState
   handle: RequestListener
+  /** Serve the gateway's worker probe while the application is still loading. */
+  probe?: RequestListener
   upgrade: UpgradeHandler
 }
 

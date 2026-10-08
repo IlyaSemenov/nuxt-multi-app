@@ -7,10 +7,10 @@ export default defineMultiAppFallback(() => (reason, _request, response) => {
     response.end("No Nuxt application matches this request")
     return
   }
-  if (reason.type === "starting" || reason.type === "closing") {
+  if (reason.type === "closing") {
     response.statusCode = 503
     response.setHeader("retry-after", "1")
-    response.end(`Nuxt application ${reason.appId} is ${reason.type}`)
+    response.end(`Nuxt application ${reason.appId} is closing`)
     return
   }
   response.statusCode = 500

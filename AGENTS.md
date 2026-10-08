@@ -28,6 +28,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Keep each child configuration independent; only documented mount overrides may cross from the root into a child.
 - Run production handlers, internal fetches, and close hooks inside the target application's async-local context.
 - Load a mounted application while it owns the global Kit context, and hand that context back afterwards; load children one at a time so the owner is never shared.
+- Wait for worker readiness outside the child load queue, and keep readiness probes outside application request hooks, middleware, routes, and development handlers.
 - Reject build settings that defeat the documented module-instance isolation guarantee.
 - Keep Nuxt, Nitro, and Vite private API adaptations in `src/nuxt/compat.ts`.
 - Check external package versions only in production builds, per application; dev and `nuxt prepare` must not register the check.
@@ -54,7 +55,8 @@ Do not catalog files or restate information evident from their names and locatio
 - Before the first publication, update `.changeset/initial-release.md` instead of creating additional changesets.
 - After the first publication, add one `.changeset/*.md` file for each independently releasable user-visible change.
 - Do not add changesets for internal refactors, maintenance, tests, or documentation changes that do not require a package release.
-- Choose the SemVer bump from the public contract: `patch` for backward-compatible fixes, `minor` for backward-compatible functionality, and `major` for breaking changes.
+- Choose the SemVer bump from the public contract: `patch` for backward-compatible fixes and `minor` for backward-compatible functionality.
+- Use `minor` for breaking changes while the package version is `0.x`; from `1.0.0`, use `major` for breaking changes.
 - Do not edit the package version or `CHANGELOG.md` by hand, and do not run `changeset version` or `changeset publish`; the release workflow consumes pending changesets.
 
 ## Tests
