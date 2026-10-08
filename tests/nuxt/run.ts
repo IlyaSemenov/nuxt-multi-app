@@ -308,6 +308,39 @@ async function assertProductionShutdown(origin: string, server: ReturnType<typeo
   await active
 }
 
+/** Closing after a failed first compilation releases the build without fixing its source. */
+async function assertFailedCompilationShutdown() {
+  const port = await unusedPort()
+  const closeRequest = join(workspace, "failed-compilation.close")
+  const brokenRoute = join(workspace, "startup/web/server/api/broken.get.ts")
+  await mkdir(join(workspace, "startup/web/server/api"), { recursive: true })
+  await writeFile(brokenRoute, "export default defineEventHandler(() => {\n")
+  const child = spawnOwned(["node", "startup/close.mjs"], {
+    cwd: workspace,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      NUXT_TELEMETRY_DISABLED: "1",
+      NUXT_MULTI_APP_TEST_CLOSE: closeRequest,
+    },
+  })
+  try {
+    await waitUntil(
+      child,
+      async () =>
+        (await (await fetch(`http://127.0.0.1:${port}/ready`)).json()).apps.web === "failed",
+      "Child did not report its first compilation error",
+    )
+    await writeFile(closeRequest, "")
+    assert.equal(await within(child.exited, 15_000, "Closing after a failed compilation"), 0)
+    await assertGroupStopped(child, "Failed compilation left processes running")
+  } finally {
+    if (groupRunning(child)) signalGroup(child, "SIGKILL")
+    await child.exited
+    await rm(brokenRoute, { force: true })
+  }
+}
+
 /** Worker startup errors, including 503 errors, fail held requests and recover on a fixed build. */
 async function assertWorkerStartupFailure() {
   const port = await unusedPort()
@@ -941,6 +974,7 @@ try {
     ["node", "node_modules/nuxt/bin/nuxt.mjs", "dev", "root", "--host", "127.0.0.1"],
     workspace,
   )
+  await assertFailedCompilationShutdown()
   await assertWorkerStartupFailure()
   await assertIndependentStartup()
   await assertIndependentStartup(true)

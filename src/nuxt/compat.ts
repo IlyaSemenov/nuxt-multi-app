@@ -43,8 +43,11 @@ export async function withGlobalNuxtContext(nuxt: Nuxt, load: (nuxt: Nuxt) => Pr
   try {
     await load(nuxt)
   } finally {
-    if (previous) nuxtCtx.set(previous, true)
-    else nuxtCtx.unset()
+    // Closing the root can clear the context while a child is still loading; do not restore it.
+    if (nuxtCtx.tryUse() === nuxt) {
+      if (previous) nuxtCtx.set(previous, true)
+      else nuxtCtx.unset()
+    }
   }
 }
 

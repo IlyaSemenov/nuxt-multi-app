@@ -44,6 +44,7 @@ export function createChild(
   let probeHandler: RequestListener | undefined
   let appUpgrade: ReturnType<typeof getDevUpgrade>
   let starting: Promise<void> | undefined
+  const stopBuild = Promise.withResolvers<void>()
   let closing: Promise<void> | undefined
   let mounting: Promise<void> | undefined
   let probeController: AbortController | undefined
@@ -79,6 +80,10 @@ export function createChild(
       // Nuxt keeps waiting for the first successful Nitro compilation, so a compilation error would otherwise
       // hold requests until the sources are fixed; answer them with the failure meanwhile.
       nitro.hooks.hook("dev:error", (error) => {
+        if (closing) {
+          stopBuild.resolve()
+          return
+        }
         if (state.type !== "starting") return
         probeController?.abort()
         retryOnCompile = true
@@ -103,7 +108,9 @@ export function createChild(
       if (closing) return
       watchChildConfig(nuxt)
       await nuxt.runWithContext(() => writeTypes(nuxt))
-      await buildNuxt(nuxt)
+      // A failed first compilation leaves Nuxt's build pending until the source is fixed.
+      // Shutdown may stop waiting after that failure, then close Nuxt's registered resources.
+      await Promise.race([buildNuxt(nuxt), stopBuild.promise])
     })
     if (closing) return
     handler = getDevHandler(nuxt)
@@ -201,6 +208,7 @@ export function createChild(
     },
     close() {
       if (closing) return closing
+      if (state.type === "failed") stopBuild.resolve()
       setState({ type: "closing" })
       probeController?.abort()
       // Let Nuxt release its watcher, Nitro worker and Vite servers in their registered order.
