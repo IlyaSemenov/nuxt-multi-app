@@ -341,8 +341,8 @@ async function assertFailedCompilationShutdown() {
   }
 }
 
-/** Worker startup errors, including 503 errors, fail held requests and recover on a fixed build. */
-async function assertWorkerStartupFailure() {
+/** Startup exceptions and worker exits fail held requests and recover on a fixed build. */
+async function assertWorkerStartupFailure(failure: "error" | "exit-0" | "exit-1") {
   const port = await unusedPort()
   const origin = `http://127.0.0.1:${port}`
   const plugin = join(workspace, "startup/web/server/plugins/failure.ts")
@@ -358,7 +358,7 @@ async function assertWorkerStartupFailure() {
         HOST: "127.0.0.1",
         PORT: String(port),
         NUXT_TELEMETRY_DISABLED: "1",
-        NUXT_MULTI_APP_TEST_WORKER_FAILURE: "1",
+        NUXT_MULTI_APP_TEST_WORKER_FAILURE: failure,
         NUXT_MULTI_APP_TEST_REQUESTS: requests,
       },
     },
@@ -370,7 +370,7 @@ async function assertWorkerStartupFailure() {
       "Listener did not start",
     )
     const pending = fetch(`${origin}/probe/page`, { headers: { "x-test-client": "1" } })
-    const failed = await within(pending, 30_000, "Request held for a crashed worker")
+    const failed = await within(pending, 30_000, `Request held for a crashed worker (${failure})`)
     assert.equal(failed.status, 500)
     assert.equal(await failed.text(), "Nuxt application web failed to start")
     assert.equal((await (await fetch(`${origin}/ready`)).json()).apps.web, "failed")
@@ -975,7 +975,9 @@ try {
     workspace,
   )
   await assertFailedCompilationShutdown()
-  await assertWorkerStartupFailure()
+  for (const failure of ["error", "exit-0", "exit-1"] as const) {
+    await assertWorkerStartupFailure(failure)
+  }
   await assertIndependentStartup()
   await assertIndependentStartup(true)
   await checkServer(
