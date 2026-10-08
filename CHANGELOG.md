@@ -1,5 +1,15 @@
 # nuxt-multi-app
 
+## 0.10.0
+
+### Minor Changes
+
+- f985534: In development, wait for applications to start instead of returning 503 to incoming requests and dispatches.
+
+### Patch Changes
+
+- 293b1c3: Fix development server shutdown hanging after an application's first compilation fails.
+
 ## 0.9.0
 
 ### Minor Changes
