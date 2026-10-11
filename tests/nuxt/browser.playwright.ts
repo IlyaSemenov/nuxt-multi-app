@@ -288,10 +288,12 @@ test("isolates mounted applications and exercises their browser runtime", async 
       const socketGenerations = socketEvents.map((events) => ({ ...events }))
       const stream = openStream(`${origins[1]}/api/slow-probe`)
       await stream.started
+      // The CLI skips the restart when a save leaves the resolved configuration unchanged; each
+      // round adds a later duplicate key, which overrides the previous rounds' values.
       await replace(
         join(workspace, app, "nuxt.config.ts"),
-        'compatibilityDate: "2026-09-12"',
-        `compatibilityDate: "2026-09-12", // FULL_RESTART_${round + 1}`,
+        "devtools: { enabled: false }",
+        `runtimeConfig: { fullRestart: ${round + 1} }, devtools: { enabled: false }`,
       )
       const streamOutcome = await Promise.race([stream.finished, timeout(15_000, "pending")])
       stream.request.destroy()

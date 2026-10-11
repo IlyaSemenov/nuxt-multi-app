@@ -16,7 +16,7 @@ import { satisfies } from "semver"
 
 import type { UpgradeHandler } from "../runtime/contract"
 
-const SUPPORTED_NUXT = "~4.5.2"
+const SUPPORTED_NUXT = "~4.5.2 || ~4.6.1"
 
 /** Reject Nuxt releases outside the range covered by the private-API adapter. */
 export function assertSupportedNuxt(nuxt: Nuxt) {
@@ -59,11 +59,15 @@ export function inlineViteBridge(nuxt: Nuxt, id: string) {
     if (!options || JSON.parse(options).root !== nuxt.options.srcDir) {
       throw new Error(`nuxt-multi-app: Vite bridge belongs to another application (${id})`)
     }
-    // Match the aliased import below; leaving this dynamic lets a reloaded worker use a child's IPC.
-    nitro.options.replace["__nuxtMultiAppProcess.env.NUXT_VITE_NODE_OPTIONS"] =
-      JSON.stringify(options)
-    const bridge = /\/@nuxt\/vite-builder\/dist\/vite-node(?:-entry|-runner)?\.mjs$/
-    const bridgeImport = /^#vite-node(?:-entry|-runner)?$/
+    // Reloaded workers must retain this application's snapshot instead of reading the shared env.
+    nitro.options.replace["process.env.NUXT_VITE_NODE_OPTIONS"] = JSON.stringify(options)
+    // Every bridge module is inlined, so that importers such as Nuxt 4.6's SSR source map plugin
+    // share the worker's bundled bridge instead of an external copy reading the shared env.
+    const bridge =
+      /\/@nuxt\/vite-builder\/dist\/(?:vite-node(?:-entry|-runner)?|ssr-sourcemap)\.mjs$/
+    const bridgeImport = /^#(?:vite-node(?:-entry|-runner)?|ssr-sourcemap)$/
+    // Only these bridge modules import `process`; the others reach it through them.
+    const processBridge = /\/@nuxt\/vite-builder\/dist\/vite-node(?:-entry|-runner)?\.mjs$/
     const bridgeDir = dirname(nitro.options.alias["#vite-node"]!)
     nitro.options.externals.inline ??= []
     nitro.options.externals.inline.push(bridge)
@@ -86,31 +90,14 @@ export function inlineViteBridge(nuxt: Nuxt, id: string) {
         transform: {
           order: "pre",
           handler(code: string, id: string) {
-            if (!bridge.test(id)) return
+            if (!processBridge.test(id)) return
             const processImport = /^import process from (["'])node:process\1;?/m.exec(code)
             if (!processImport) {
               throw new Error(`nuxt-multi-app: Vite bridge process import changed (${id})`)
             }
             const transformed = new MagicString(code)
-            // Nitro injects its own `process` import when rendering chunks containing import.meta.
-            transformed.overwrite(
-              processImport.index,
-              processImport.index + processImport[0].length,
-              'import __nuxtMultiAppProcess from "node:process";',
-            )
-            for (const match of code.matchAll(/\bprocess\b/g)) {
-              if (
-                match.index >= processImport.index &&
-                match.index < processImport.index + processImport[0].length
-              ) {
-                continue
-              }
-              transformed.overwrite(
-                match.index,
-                match.index + "process".length,
-                "__nuxtMultiAppProcess",
-              )
-            }
+            // Use Node's global process to avoid colliding with Nitro's injected process import.
+            transformed.remove(processImport.index, processImport.index + processImport[0].length)
             return {
               code: transformed.toString(),
               map: transformed.generateMap({ hires: true }).toString(),

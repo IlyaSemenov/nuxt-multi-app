@@ -2,7 +2,7 @@ import type { NuxtConfig } from "nuxt/schema"
 
 import type { RoutingGuards, RoutingRule } from "./runtime/routing"
 
-export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir">
+export type AppOverrides = Omit<NuxtConfig, "buildDir" | "rootDir" | "typesDir">
 
 /** Configuration for the root Nuxt application that owns the public listener. */
 export interface RootOptions {

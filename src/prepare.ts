@@ -12,9 +12,11 @@ const TYPESCRIPT_PROJECTS = ["app", "server", "shared", "node"] as const
 
 /** Register generation of the composition solution and every child's mounted declarations. */
 export function prepareComposition(options: NormalizedModuleOptions, root: Nuxt) {
+  // Nuxt 4.6 writes the root's generated projects to `typesDir`, which Nuxt 4.5 does not have.
+  const typesDir = root.options.typesDir ?? root.options.buildDir
   root.hook("prepare:types", async () => {
-    await mkdir(options.root.buildDir, { recursive: true })
-    await writeFile(resolve(options.root.buildDir, TYPECHECK_SOLUTION), typecheckSolution(options))
+    await mkdir(typesDir, { recursive: true })
+    await writeFile(resolve(typesDir, TYPECHECK_SOLUTION), typecheckSolution(options, typesDir))
   })
   // Nuxt CLI clears the root build directory after module setup, so nested child artifacts must
   // be generated from the build lifecycle that follows that cleanup.
@@ -29,11 +31,17 @@ async function prepareChildren(options: NormalizedModuleOptions) {
   }
 }
 
-/** Generate a TypeScript solution that checks every Nuxt profile in the composition. */
-function typecheckSolution(options: NormalizedModuleOptions) {
+/**
+ * Generate a TypeScript solution, written to the root's types directory, that checks every Nuxt
+ * profile in the composition. Mounted children write their types to their build directory.
+ */
+function typecheckSolution(options: NormalizedModuleOptions, typesDir: string) {
   const references = options.allApps.flatMap((app) =>
     TYPESCRIPT_PROJECTS.map((project) => ({
-      path: relativePath(options.root.buildDir, resolve(app.buildDir, `tsconfig.${project}.json`)),
+      path: relativePath(
+        typesDir,
+        resolve(app.isRoot ? typesDir : app.buildDir, `tsconfig.${project}.json`),
+      ),
     })),
   )
   return `${JSON.stringify({ files: [], references }, null, 2)}\n`

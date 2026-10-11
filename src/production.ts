@@ -1,4 +1,4 @@
-import { copyFile, readFile, writeFile } from "node:fs/promises"
+import { readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
 import { createResolver } from "@nuxt/kit"
@@ -29,6 +29,11 @@ const serverEntry = resolver.resolve("./runtime/server.js")
 export function setupProductionBuild(options: NormalizedModuleOptions, root: Nuxt) {
   checkExternalVersions(root, options.root.id, options.allApps)
   applyHandlerOutput(root.options.nitro, options.root.id)
+  // Nitro writes this command to `nitro.json`, and Nuxt CLI also reads it from the configuration.
+  root.options.nitro.commands = {
+    ...root.options.nitro.commands,
+    preview: `node ./${PRODUCTION_ENTRY}`,
+  }
   const rootOutput = captureNitroOutput(root, options.root.id)
   root.hook("ready", () => {
     // Nitro cleans and writes the root output from a `build:done` hook it registers while Nuxt
@@ -50,10 +55,7 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
       // Nitro integrations may modify the generated handler from their close hooks, so install the
       // multiplexer only after Nitro and every other hook registered before the completed build.
       root.hook("close", async () => {
-        await copyFile(
-          resolve(output.dir, "nitro.json"),
-          resolve(appDir(output.dir, options.root.id), "nitro.json"),
-        )
+        await writeRootAppBuildInfo(output.dir, appDir(output.dir, options.root.id))
         await writeProductionServer(output.dir, entries, options, root)
       })
     })
@@ -137,20 +139,16 @@ async function writeProductionServer(
     debug: options.debug,
   }
   await writeFile(resolve(entryDir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`)
-  await setPreviewCommand(outputDir)
   logger.info(`entry ${entry}`)
 }
 
-/** Point Nitro-compatible launchers at the multiplexer instead of an import-only app handler. */
-async function setPreviewCommand(outputDir: string) {
-  const path = resolve(outputDir, "nitro.json")
-  const buildInfo = JSON.parse(await readFile(path, "utf8")) as {
+/** Copy the root's Nitro build metadata beside its handler, which cannot be previewed by itself. */
+async function writeRootAppBuildInfo(outputDir: string, rootAppDir: string) {
+  const buildInfo = JSON.parse(await readFile(resolve(outputDir, "nitro.json"), "utf8")) as {
     commands?: { preview?: string; deploy?: string }
   }
-  buildInfo.commands ??= {}
-  // Nuxt runs this command with the Nitro output directory as its working directory.
-  buildInfo.commands.preview = `node ./${PRODUCTION_ENTRY}`
-  await writeFile(path, `${JSON.stringify(buildInfo, null, 2)}\n`)
+  delete buildInfo.commands?.preview
+  await writeFile(resolve(rootAppDir, "nitro.json"), `${JSON.stringify(buildInfo, null, 2)}\n`)
 }
 
 /** Configure a Nitro output as an importable handler owned by the common server. */

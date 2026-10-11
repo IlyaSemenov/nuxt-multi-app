@@ -32,7 +32,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Reject build settings that defeat the documented module-instance isolation guarantee.
 - Keep Nuxt, Nitro, and Vite private API adaptations in `src/nuxt/compat.ts`.
 - Check external package versions only in production builds, per application; dev and `nuxt prepare` must not register the check.
-- Embed each application's Vite bridge options as literals in its Nitro bundle, including after renaming the bridge's `process` import.
+- Embed each application's Vite bridge options as literals in its Nitro bundle, and inline every bridge module so none reads the shared env at runtime.
 - Close children through their Nuxt lifecycle and prevent starts or forwarded restarts once their generation begins closing.
 - Register loaded child and layer configuration files with the child's native builder watcher before building.
 - Keep `src/runtime/` free of imports from outside it, including type-only imports; declare contracts it shares with build-time code inside `src/runtime/`.
@@ -75,3 +75,4 @@ Do not catalog files or restate information evident from their names and locatio
 - Run the `test` script when behavior changes.
 - Run the `build` script when package exports, declarations, or supported runtimes change.
 - Run `test:nuxt` when changing Nuxt compatibility, plugin injection, dev routing, production output, dispatch, HMR, or WebSockets.
+- `test:nuxt` covers only the newest supported Nuxt minor; when changing Nuxt compatibility, child loading, the Vite bridge, or production output, also run `bun run build && bun tests/nuxt/run.ts <version>` for every older supported minor (currently `4.5.2`).

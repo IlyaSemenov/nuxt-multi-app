@@ -44,7 +44,7 @@ export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: "nuxt-multi-app",
     configKey: "multiApp",
-    compatibility: { nuxt: "~4.5.2" },
+    compatibility: { nuxt: "~4.5.2 || ~4.6.1" },
   },
   defaults: MODULE_DEFAULTS,
   setup: setupModule,

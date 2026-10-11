@@ -14,7 +14,7 @@ const fixture = join(root, "tests/fixtures")
 const workspace = await mkdtemp(join(tmpdir(), "nuxt-multi-app-"))
 const portable = await mkdtemp(join(tmpdir(), "nuxt-multi-app-output-"))
 
-const nuxtVersion = process.argv[2] ?? "4.5.2"
+const nuxtVersion = process.argv[2] ?? "4.6.1"
 const hosts = { root: "landing.localhost", web: "foo.tenant.localhost" }
 
 /** Whether owned processes get their own process group, which Windows lacks. */
@@ -366,7 +366,14 @@ async function assertWorkerStartupFailure(failure: "error" | "exit-0" | "exit-1"
   try {
     await waitUntil(
       child,
-      async () => (await fetch(`${origin}/ready`)).status === 503,
+      async () => {
+        // The CLI answers 503 with its own loading page until the root has loaded.
+        const response = await fetch(`${origin}/ready`)
+        return (
+          response.status === 503 &&
+          !!response.headers.get("content-type")?.startsWith("application/json")
+        )
+      },
       "Listener did not start",
     )
     const pending = fetch(`${origin}/probe/page`, { headers: { "x-test-client": "1" } })

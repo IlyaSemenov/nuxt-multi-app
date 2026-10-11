@@ -49,6 +49,8 @@ function childOverrides(app: NormalizedAppOptions, mode: ChildMode): NuxtConfig 
     // Nuxt's internal prepare mode generates templates without starting a normal build.
     ...(mode.type === "prepare" ? { _prepare: true } : undefined),
     buildDir: app.buildDir,
+    // Nuxt 4.6 writes types beside the child's standalone build when only buildDir is overridden.
+    typesDir: app.buildDir,
     // A mounted child has no listener of its own, so it describes the root's public one.
     ...(mode.type === "dev"
       ? { devServer: { ...mode.devServer, ...overrides.devServer } }

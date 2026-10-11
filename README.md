@@ -13,7 +13,7 @@ It is not client-side microfrontend composition.
 
 ## Status
 
-Beta, tied to Nuxt `~4.5.2`.
+Beta, tied to Nuxt `~4.5.2 || ~4.6.1`.
 The module builds on internal Nuxt, Nitro, and Vite APIs, so each Nuxt minor needs its own release.
 
 ## Installation
@@ -166,7 +166,7 @@ Add `overrides` to an `apps` entry to apply configuration only while the child r
 A mounted child generates files in `<child>/.nuxt/cache/nuxt-multi-app/<root-id>-<hash>`, with a separate directory for each composition.
 The child's standalone `nuxt prepare` and `nuxt build` preserve this directory; `nuxt cleanup` deletes it.
 
-The root also writes `.nuxt/tsconfig.multi-app.json`, a TypeScript solution that references every generated project in the composition.
+The root also writes `.nuxt/tsconfig.multi-app.json` (in the root's `typesDir` when one is set), a TypeScript solution that references every generated project in the composition.
 Check the root and every mounted child with the Vue-aware TypeScript checker used by your project, such as `vue-tsc`:
 
 ```sh

@@ -18,6 +18,13 @@ export async function readViteSnapshots(workspace: string) {
       const source = await readFile(join(buildDir, "dev/index.mjs"), "utf8")
       const literal = source.match(/const envVar = (".*");/)
       assert(literal, "The Nitro worker must contain a literal Vite bridge snapshot")
+      // An external bridge module would read the shared env, which belongs to the last loaded app.
+      assert(
+        !/@nuxt\/vite-builder\/dist\/(?:vite-node(?:-entry|-runner)?|ssr-sourcemap)\.mjs/.test(
+          source,
+        ),
+        "The Nitro worker must not import the Vite bridge externally",
+      )
       const snapshot = JSON.parse(JSON.parse(literal[1]!)) as { root: string; socketPath: string }
       assert.equal(
         await realpath(snapshot.root),
