@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.11.0
+
+### Minor Changes
+
+- e6d24bd: Support Nuxt 4.6 alongside Nuxt 4.5.
+
 ## 0.10.0
 
 ### Minor Changes
