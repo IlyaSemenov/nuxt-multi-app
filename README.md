@@ -159,6 +159,54 @@ Add `overrides` to an `apps` entry to apply configuration only while the child r
 
 `overrides` reaches the child exactly as written: Nuxt resolves relative paths in it from the child's directory and leaves alias values alone, so write paths as absolute.
 
+### Shared dependencies
+
+A child often runs code that resolves packages from the root's directory, such as workspace packages of the root it imports or root code mounted through `overrides`.
+That code and the child's own code work together only when both resolve a package to one installation.
+Otherwise the child loads two copies: a dependency injection container, an ORM, or an error-tracking SDK then keeps two separate states, and errors surface far from their cause.
+The option does not make applications share module instances: each application still loads its own copy, as described in [Isolation and limitations](#isolation-and-limitations).
+
+This happens with a nested checkout whose packages belong to the root's workspace:
+
+```text
+package.json         # workspaces: ["apps/*", "billing/apps/*", "billing/packages/*"]
+node_modules/        # one install for every workspace package
+apps/landing/        # root application
+billing/             # nested checkout of another repository
+└── apps/web/        # child application
+```
+
+List the packages that must come from one installation in `sharedDependencies` of the child:
+
+```ts
+// apps/landing/nuxt.config.ts
+multiApp: {
+  apps: [
+    {
+      id: "billing",
+      rootDir: "../../billing/apps/web",
+      sharedDependencies: ["ripple-di", "orchid-orm", "@sentry/nuxt"],
+    },
+  ],
+}
+```
+
+Module setup in `nuxt dev`, `nuxt prepare`, and `nuxt build` looks up each listed package from the root application's directory and from the child's directory, through the nearest `node_modules` directories as Node does.
+Setup fails before any child application loads unless both lookups reach the same real directory, or when a package is not installed for one of the applications.
+The error names the package, the child, and both directories.
+
+Different directories usually mean that the child was installed separately from the root, for example by an install run inside the nested checkout, or that it is linked to another checkout or worktree of the root.
+
+The lookup ignores package `exports`, so packages that export only subpaths or only types are found as well.
+
+Only the listed packages are checked, because applications may intentionally use other versions of a package or bundle their own copy with `nitro.externals.inline`.
+
+The [external package version check](#external-package-versions) addresses a related problem with other trade-offs:
+
+- it runs only during `nuxt build`, while `sharedDependencies` is checked in every mode;
+- it inspects the imports of every server bundle, while `sharedDependencies` checks only the listed packages;
+- it compares version numbers, while `sharedDependencies` also rejects two installations of the same version.
+
 ### Generated types
 
 `nuxt prepare` writes type files for the root and every child without building bundles.
@@ -378,7 +426,7 @@ Bundling changes how a package loads; check packages with native add-ons or file
 
 The check has limits:
 
-- It compares version numbers only, so copies of one version with different patches or peer dependencies count as one package.
+- It compares version numbers only, so copies of one version with different patches or peer dependencies count as one package; list such packages in [`sharedDependencies`](#shared-dependencies) to require one installation.
 - It does not see imports the bundler cannot resolve, such as `createRequire()` or computed specifiers.
 - It also counts imports that tree shaking removes, because Nitro packages their version anyway.
 

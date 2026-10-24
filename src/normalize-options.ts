@@ -15,6 +15,8 @@ import type {
 import { MODULE_DEFAULTS } from "./options"
 
 const ID_PATTERN = /^[a-z0-9-]+$/
+/** A bare package name, optionally scoped, without a subpath. */
+const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i
 
 /** Validate and resolve every path before any additional Nuxt instance is loaded. */
 export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): NormalizedModuleOptions {
@@ -27,6 +29,7 @@ export function normalizeOptions(options: ModuleOptions, nuxt: Nuxt): Normalized
     rootDir,
     overrides: {},
     buildDir: nuxt.options.buildDir,
+    sharedDependencies: [],
     isRoot: true,
   }
 
@@ -111,8 +114,24 @@ function normalizeApp(
     rootDir: appRootDir,
     overrides: app.overrides ?? {},
     buildDir,
+    sharedDependencies: normalizeSharedDependencies(app),
     isRoot: false,
   }
+}
+
+function normalizeSharedDependencies(app: AppOptions) {
+  const names = app.sharedDependencies ?? []
+  if (!Array.isArray(names)) {
+    throw new Error(`nuxt-multi-app: sharedDependencies of ${app.id} must be an array`)
+  }
+  for (const name of names) {
+    if (typeof name !== "string" || !PACKAGE_NAME_PATTERN.test(name)) {
+      throw new Error(
+        `nuxt-multi-app: sharedDependencies of ${app.id} must list package names without subpaths: ${name}`,
+      )
+    }
+  }
+  return [...new Set(names)]
 }
 
 /**

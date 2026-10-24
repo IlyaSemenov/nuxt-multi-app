@@ -162,3 +162,31 @@ describe("application directories", () => {
     })
   })
 })
+
+describe("shared dependencies", () => {
+  const mount = (sharedDependencies: unknown) =>
+    normalizeOptions(
+      {
+        apps: [
+          { id: "web", rootDir: "../web", sharedDependencies: sharedDependencies as string[] },
+        ],
+        routing: [{ app: "web" }],
+      },
+      nuxt,
+    )
+
+  it("keeps each listed package once and lists none for the root", () => {
+    const options = mount(["ripple-di", "@sentry/nuxt", "ripple-di"])
+
+    expect(options.apps[0]!.sharedDependencies).toEqual(["ripple-di", "@sentry/nuxt"])
+    expect(options.root.sharedDependencies).toEqual([])
+    expect(mount(undefined).apps[0]!.sharedDependencies).toEqual([])
+  })
+
+  it("rejects entries that are not bare package names", () => {
+    expect(() => mount("ripple-di")).toThrow("sharedDependencies of web must be an array")
+    for (const name of ["ripple-di/server", "@sentry", "./local", "", 1]) {
+      expect(() => mount([name])).toThrow("must list package names without subpaths")
+    }
+  })
+})

@@ -12,7 +12,14 @@ describe("child shutdown before loading", () => {
     it(`releases an awaiting request${disconnected ? " after its caller disconnects" : " with the closing fallback"}`, async () => {
       const reasons: MultiAppFallbackReason[] = []
       const child = createChild(
-        { id: "web", rootDir: "/unused", buildDir: "/unused/.nuxt", overrides: {}, isRoot: false },
+        {
+          id: "web",
+          rootDir: "/unused",
+          buildDir: "/unused/.nuxt",
+          overrides: {},
+          sharedDependencies: [],
+          isRoot: false,
+        },
         {
           root: {} as Nuxt,
           ids: ["root", "web"],

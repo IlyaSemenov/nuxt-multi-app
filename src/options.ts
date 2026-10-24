@@ -24,6 +24,12 @@ export interface AppOptions {
   buildDir?: string
   /** Explicit mount-point configuration applied after the child's own configuration. */
   overrides?: AppOverrides
+  /**
+   * Packages that must resolve to the same installed directory from this application and from the
+   * root application, such as libraries whose state the child's code shares with code it imports
+   * from the root's directory; module setup fails otherwise.
+   */
+  sharedDependencies?: string[]
 }
 
 /** One ordered routing rule that targets an application or invokes a project resolver. */
@@ -62,6 +68,7 @@ export interface NormalizedAppOptions {
   rootDir: string
   overrides: AppOverrides
   buildDir: string
+  sharedDependencies: string[]
   isRoot: boolean
 }
 

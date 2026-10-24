@@ -235,6 +235,47 @@ async function assertPackageVersions(origin: string) {
 }
 
 /**
+ * Prepare with a shared dependency that the root and the child install separately, so module setup
+ * must fail before any child loads.
+ */
+async function assertSharedDependencyConflict(cwd: string) {
+  const child = spawnOwned(["node", "node_modules/nuxt/bin/nuxt.mjs", "prepare", "root"], {
+    cwd,
+    env: {
+      ...process.env,
+      NUXT_TELEMETRY_DISABLED: "1",
+      NUXT_MULTI_APP_TEST_SHARED: "conflict",
+    },
+    output: "pipe",
+  })
+  const [exitCode, ...output] = await within(
+    Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]),
+    120_000,
+    "The conflicting prepare did not finish",
+  )
+  await assertGroupStopped(child, "The failed prepare left processes running")
+  // oxlint-disable-next-line no-control-regex
+  const text = output.join("\n").replace(/\x1b\[[0-9;]*m/g, "")
+  assert.notEqual(exitCode, 0, "Module setup accepted separately installed shared dependencies")
+  const dir = await realpath(cwd)
+  assert(
+    text.includes(
+      [
+        'version-probe in app "web"',
+        `  root "root": ${join(dir, "root/node_modules/version-probe")}`,
+        `  child "web": ${join(dir, "web/node_modules/version-probe")}`,
+      ].join("\n"),
+    ),
+    text,
+  )
+  assert(!text.includes('vue in app "web"'), text)
+}
+
+/**
  * Build without the child's inline override: the root code mounted into the child imports another
  * version of a package than the child, so the version check must fail the build once and exit.
  */
@@ -954,6 +995,7 @@ try {
     ...process.env,
     NUXT_MULTI_APP_TEST_EXTERNALS: "conflict",
   })
+  await assertSharedDependencyConflict(workspace)
   const typecheckConfig = join(workspace, "root/.nuxt/tsconfig.multi-app.json")
   const typecheckSolution = JSON.parse(await readFile(typecheckConfig, "utf8"))
   const webBuildDir = await mountedWebBuildDir(workspace)

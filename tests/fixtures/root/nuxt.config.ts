@@ -36,6 +36,12 @@ export default defineNuxtConfig({
                 ? {}
                 : { nitro: { externals: { inline: ["version-probe"] } } }),
             },
+            // The root and the child have separate installations of `version-probe`; the test runner
+            // adds it to check that module setup fails.
+            sharedDependencies: [
+              "vue",
+              ...(process.env.NUXT_MULTI_APP_TEST_SHARED === "conflict" ? ["version-probe"] : []),
+            ],
           },
         ],
         routing: [

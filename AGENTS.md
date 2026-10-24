@@ -32,6 +32,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Reject build settings that defeat the documented module-instance isolation guarantee.
 - Keep Nuxt, Nitro, and Vite private API adaptations in `src/nuxt/compat.ts`.
 - Check external package versions only in production builds, per application; dev and `nuxt prepare` must not register the check.
+- Check `sharedDependencies` during module setup in every mode, before any child loads; locate packages through `node_modules` lookup, not through package `exports`.
 - Embed each application's Vite bridge options as literals in its Nitro bundle, and inline every bridge module so none reads the shared env at runtime.
 - Close children through their Nuxt lifecycle and prevent starts or forwarded restarts once their generation begins closing.
 - Register loaded child and layer configuration files with the child's native builder watcher before building.
