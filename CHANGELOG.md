@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.12.0
+
+### Minor Changes
+
+- 8c5040a: Add `apps[].sharedDependencies` to fail module setup when a listed package does not resolve to the same installed directory from the root application and from the child.
+
 ## 0.11.0
 
 ### Minor Changes
