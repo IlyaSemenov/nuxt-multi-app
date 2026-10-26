@@ -3,17 +3,28 @@ import { dirname, isAbsolute } from "node:path"
 
 import { build } from "esbuild"
 import type { BuildOptions, Plugin } from "esbuild"
+import type { NitroOptions } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
+
+/** The root application's Nitro settings that bundles written into the production output follow. */
+export interface NitroOutputSettings {
+  minify: boolean
+  sourceMap: NitroOptions["sourceMap"]
+}
 
 interface BundleForOutputOptions {
   define?: BuildOptions["define"]
   plugins?: Plugin[]
 }
 
-/** Bundle one ESM entry with every dependency inlined, so the output runs without node_modules. */
+/**
+ * Bundle one ESM entry with every dependency inlined, so the output runs without node_modules.
+ * Without `settings`, the bundle is readable and has a linked source map with sources.
+ */
 export async function bundleForOutput(
   input: string,
   output: string,
+  settings?: NitroOutputSettings,
   options: BundleForOutputOptions = {},
 ) {
   await mkdir(dirname(output), { recursive: true })
@@ -24,19 +35,35 @@ export async function bundleForOutput(
     format: "esm",
     platform: "node",
     target: "node22",
-    sourcemap: true,
     packages: "bundle",
+    ...(settings ? toEsbuildOutput(settings) : { sourcemap: true }),
     ...options,
   })
 }
 
 /** Bundle project-owned routing code so the generated Nitro output remains portable. */
-export function bundleProjectModule(input: string, output: string, nuxt: Nuxt) {
-  return bundleForOutput(input, output, {
+export function bundleProjectModule(
+  input: string,
+  output: string,
+  nuxt: Nuxt,
+  settings?: NitroOutputSettings,
+) {
+  return bundleForOutput(input, output, settings, {
     // Project modules execute beside Nitro handlers, so expose the same live environment contract.
     define: { "import.meta.env": "process.env" },
     plugins: [projectHelpers(), nuxtAliases(nuxt.options.alias)],
   })
+}
+
+/** Map Nitro output settings to esbuild options that match Nitro's own server bundles. */
+function toEsbuildOutput({ minify, sourceMap }: NitroOutputSettings): BuildOptions {
+  return {
+    // Nitro's terser keeps function and class names, so stack frames and error names stay readable.
+    ...(minify ? { minify: true, keepNames: true } : {}),
+    sourcemap: sourceMap === "hidden" ? "external" : sourceMap === true ? "linked" : sourceMap,
+    // Nitro excludes sources from its maps, so shipped maps do not reveal the original code.
+    sourcesContent: false,
+  }
 }
 
 function projectHelpers(): Plugin {

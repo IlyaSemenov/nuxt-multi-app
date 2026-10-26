@@ -2,11 +2,11 @@ import { readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
 import type {} from "@nuxt/nitro-server"
-import type { NitroConfig } from "nitropack/types"
+import type { NitroConfig, NitroOptions } from "nitropack/types"
 import { createResolver } from "nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
-import { bundleForOutput, bundleProjectModule } from "./bundle"
+import { bundleForOutput, bundleProjectModule, type NitroOutputSettings } from "./bundle"
 import { checkExternalVersions } from "./external-versions"
 import {
   appDir,
@@ -56,7 +56,7 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
       // multiplexer only after Nitro and every other hook registered before the completed build.
       root.hook("close", async () => {
         await writeRootAppBuildInfo(output.dir, appDir(output.dir, options.root.id))
-        await writeProductionServer(output.dir, entries, options, root)
+        await writeProductionServer(output, entries, options, root)
       })
     })
   })
@@ -65,6 +65,7 @@ export function setupProductionBuild(options: NormalizedModuleOptions, root: Nux
 interface NitroOutput {
   dir: string
   entry: string
+  settings: NitroOutputSettings
 }
 
 async function buildChild(
@@ -87,26 +88,28 @@ async function buildChild(
 
 /** Capture the Nitro entry, placing the root handler in its final directory when given its ID. */
 function captureNitroOutput(nuxt: Nuxt, rootId?: string) {
-  let output: NitroOutput | undefined
+  let options: NitroOptions | undefined
   nuxt.hook("nitro:init", (nitro) => {
     if (rootId !== undefined) {
       const rootDir = appDir(nitro.options.output.dir, rootId)
       nitro.options.output.serverDir = resolve(rootDir, "server")
       nitro.options.output.publicDir = resolve(rootDir, "public")
     }
-    output = {
-      dir: nitro.options.output.dir,
-      entry: resolve(nitro.options.output.serverDir, "index.mjs"),
-    }
+    options = nitro.options
   })
-  return () => {
-    if (!output) throw new Error("nuxt-multi-app: Nitro was not initialized")
-    return output
+  // Later hooks may still change these options, so read them once the build has used them.
+  return (): NitroOutput => {
+    if (!options) throw new Error("nuxt-multi-app: Nitro was not initialized")
+    return {
+      dir: options.output.dir,
+      entry: resolve(options.output.serverDir, "index.mjs"),
+      settings: { minify: Boolean(options.minify), sourceMap: options.sourceMap },
+    }
   }
 }
 
 async function writeProductionServer(
-  outputDir: string,
+  { dir: outputDir, settings }: NitroOutput,
   entries: { id: string; entry: string }[],
   options: NormalizedModuleOptions,
   nuxt: Nuxt,
@@ -114,18 +117,18 @@ async function writeProductionServer(
   const entry = resolve(outputDir, PRODUCTION_ENTRY)
   const entryDir = serverDir(outputDir)
   // The output runs without this package installed, so the entry is bundled from the built runtime.
-  await bundleForOutput(serverEntry, entry)
+  await bundleForOutput(serverEntry, entry, settings)
 
   const routing = await mapResolvers(options.routing, async (input, index) => {
     const output = resolve(entryDir, resolverFile(index))
-    await bundleProjectModule(input, output, nuxt)
+    await bundleProjectModule(input, output, nuxt, settings)
     return relativePath(entryDir, output)
   })
 
   let fallback: string | null = null
   if (options.fallback) {
     const output = resolve(entryDir, FALLBACK_FILE)
-    await bundleProjectModule(options.fallback, output, nuxt)
+    await bundleProjectModule(options.fallback, output, nuxt, settings)
     fallback = relativePath(entryDir, output)
   }
 

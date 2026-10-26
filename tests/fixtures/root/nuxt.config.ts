@@ -9,6 +9,9 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-09-12",
   devtools: { enabled: false },
   vite: { server: { allowedHosts: ["landing.localhost"] } },
+  // The production entry, resolvers, and fallback follow these root settings; "hidden" differs
+  // from the default. Development checks read the unminified Nitro bundle.
+  $production: { nitro: { minify: true, sourceMap: "hidden" } },
   modules: [
     contextProbe,
     lateNitroOutput,

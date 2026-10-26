@@ -906,6 +906,21 @@ async function assertEarlyBundleEvaluation(cwd: string) {
   )
 }
 
+/** The entry and project modules follow the root's `nitro.minify` and hidden `nitro.sourceMap`. */
+async function assertMinifiedEntry(cwd: string) {
+  const dir = join(cwd, "root/.output/server")
+  const files = (await readdir(dir)).filter((file) => file.endsWith(".mjs"))
+  assert.deepEqual(files.sort(), ["fallback.mjs", "index.mjs", "resolver-2.mjs"])
+  for (const file of files) {
+    const code = await readFile(join(dir, file), "utf8")
+    // Unminified esbuild output indents code and labels each module with a path comment.
+    assert.doesNotMatch(code, /^(\/\/ |[ \t])/m, `${file} is not minified`)
+    assert.doesNotMatch(code, /sourceMappingURL/, `${file} references its hidden source map`)
+    const map = JSON.parse(await readFile(join(dir, `${file}.map`), "utf8"))
+    assert.equal(map.sourcesContent, undefined, `${file}.map embeds sources`)
+  }
+}
+
 /** The build prerenders a mounted child's route that dispatches to itself and to another app. */
 async function assertPrerenderedDispatch(cwd: string) {
   const output = await readFile(join(cwd, "root/.output/apps/web/public/prerendered.json"), "utf8")
@@ -1091,6 +1106,7 @@ try {
   assert.match(rootEntry, /import "\.\/late-nitro-output\.mjs"/)
   const productionEntry = await readFile(join(workspace, "root/.output/server/index.mjs"), "utf8")
   assert.doesNotMatch(productionEntry, /late-nitro-output/)
+  await assertMinifiedEntry(workspace)
   const nitro = JSON.parse(await readFile(join(workspace, "root/.output/nitro.json"), "utf8"))
   assert.equal(nitro.commands.preview, "node ./server/index.mjs")
   await assertPrerenderedDispatch(workspace)

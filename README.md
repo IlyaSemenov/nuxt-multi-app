@@ -401,6 +401,8 @@ Everything lands in the root application's `.output`:
 The root application uses the same `apps/<app-id>` layout as its children.
 The standard Nitro entry combines those isolated outputs behind one server process.
 
+The entry and the bundled routing resolvers and fallback in `server/` follow the root application's `nitro.minify` and `nitro.sourceMap`, like its Nitro bundle, and their source maps leave out the original sources.
+
 The entry listens on `NITRO_PORT` or `PORT`, default `3000`, and on `NITRO_HOST` or `HOST` when one is set, like Nitro's `node-server` preset.
 
 On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active responses and dispatch calls up to `shutdownTimeout` to finish, and then closes every application.
