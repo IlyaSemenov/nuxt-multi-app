@@ -322,12 +322,16 @@ test("isolates mounted applications and exercises their browser runtime", async 
       snapshots = await readViteSnapshots(workspace)
       await assertSsr(context.request, "1")
       for (const [index, page] of pages.entries()) {
-        await page.goto(origins[index]!)
-        await expect(page.getByRole("heading")).toHaveText(`${markers[index]}_HMR_1`)
-        await page.waitForFunction(
-          (appId) => document.documentElement.dataset.instance === appId,
-          appIds[index],
-        )
+        // Navigation after a full Nuxt restart can be interrupted more than once. Retry navigation
+        // and page checks together.
+        await expect(async () => {
+          await page.goto(origins[index]!)
+          await expect(page.getByRole("heading")).toHaveText(`${markers[index]}_HMR_1`)
+          await page.waitForFunction(
+            (appId) => document.documentElement.dataset.instance === appId,
+            appIds[index],
+          )
+        }).toPass({ timeout: 30_000 })
       }
       await expect
         .poll(() =>
