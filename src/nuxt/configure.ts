@@ -4,6 +4,7 @@ import type { NitroConfig } from "nitropack/types"
 import type { Nuxt } from "nuxt/schema"
 
 import type { NormalizedAppOptions } from "../options"
+import { SETTINGS_MODULE, type NitroPluginSettings } from "../runtime/contract"
 import type { GatewayAddress } from "../runtime/dispatch"
 import { assertSupportedNuxt } from "./compat"
 
@@ -35,18 +36,17 @@ export function configureNuxtApp(nuxt: Nuxt, app: NormalizedAppOptions, settings
   assertIsolatedOutput(nuxt.options.nitro, app.id)
 
   // Nitro creates its prerender instance from this configuration rather than from the options of
-  // the main instance, so both bundles receive the replacements and inlined runtime.
+  // the main instance, so both bundles receive the settings module and inlined runtime.
   nuxt.hook("nitro:config", (config) => {
-    config.replace = {
-      ...config.replace,
-      "process.env.NUXT_MULTI_APP_ID": JSON.stringify(app.id),
-      // Nitro replacement values are JavaScript source; JSON-valued environment variables
-      // therefore need one serialization for their value and one for the string literal.
-      "process.env.NUXT_MULTI_APP_IDS": JSON.stringify(JSON.stringify(settings.ids)),
-      "process.env.NUXT_MULTI_APP_GATEWAY": JSON.stringify(
-        JSON.stringify(settings.gateway ?? null),
-      ),
-      "process.env.NUXT_MULTI_APP_GATEWAY_TOKEN": JSON.stringify(settings.token ?? ""),
+    const pluginSettings: NitroPluginSettings = {
+      appId: app.id,
+      ids: settings.ids,
+      gateway: settings.gateway ?? null,
+      token: settings.token ?? "",
+    }
+    config.virtual = {
+      ...config.virtual,
+      [SETTINGS_MODULE]: `export default ${JSON.stringify(pluginSettings)}`,
     }
     config.externals ??= {}
     config.externals.inline ??= []

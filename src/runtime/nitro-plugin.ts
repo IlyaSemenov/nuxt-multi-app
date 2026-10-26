@@ -1,15 +1,14 @@
 import wsAdapter from "crossws/adapters/node"
 import { defineNitroPlugin } from "nitropack/runtime"
 
+import settings from "#nuxt-multi-app/settings"
+
 import { getProductionRuntime, type NitroEvent, type NitroRuntime } from "./contract"
 import { createDevDispatch, createFetchFactory, createPrerenderDispatch } from "./dispatch"
 import type { NuxtMultiAppDispatch, NuxtMultiAppRequestContext } from "./types"
 import { installWorkerProbe } from "./worker-probe"
 
-const appId = process.env.NUXT_MULTI_APP_ID!
-const ids = JSON.parse(process.env.NUXT_MULTI_APP_IDS ?? "[]") as string[]
-const gateway = JSON.parse(process.env.NUXT_MULTI_APP_GATEWAY ?? "null")
-const token = process.env.NUXT_MULTI_APP_GATEWAY_TOKEN ?? ""
+const { appId, ids, gateway, token } = settings
 
 /** Inject the application identity and per-request dispatcher into every Nitro event. */
 export default defineNitroPlugin((nitroValue) => {
@@ -17,6 +16,9 @@ export default defineNitroPlugin((nitroValue) => {
   // Nitro replaces these flags per bundle, so a production bundle never takes another branch.
   let dispatch: NuxtMultiAppDispatch
   if (import.meta.dev) {
+    if (!gateway) {
+      throw new Error(`nuxt-multi-app: the development bundle of ${appId} has no dispatch gateway`)
+    }
     installWorkerProbe(nitroValue.h3App, token)
     dispatch = createDevDispatch(appId, ids, nitro, gateway, token)
   } else if (import.meta.prerender) {

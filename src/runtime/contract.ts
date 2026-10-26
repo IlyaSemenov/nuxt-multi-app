@@ -2,8 +2,21 @@ import type { Buffer } from "node:buffer"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { Duplex } from "node:stream"
 
+import type { GatewayAddress } from "./dispatch"
 import type { RoutingRule } from "./routing"
 import type { NuxtMultiAppDispatch } from "./types"
+
+/** Nitro virtual module that provides `NitroPluginSettings` to the module's Nitro plugin. */
+export const SETTINGS_MODULE = "#nuxt-multi-app/settings"
+
+/** Settings the module embeds in each application's Nitro bundle. */
+export interface NitroPluginSettings {
+  appId: string
+  ids: string[]
+  /** Private development gateway; `null` outside development bundles. */
+  gateway: GatewayAddress | null
+  token: string
+}
 
 /** Node `upgrade` listener signature shared by Nitro's WebSocket adapter and the production entry. */
 export type UpgradeHandler = (request: IncomingMessage, socket: Duplex, head: Buffer) => unknown
