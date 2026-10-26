@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.12.2
+
+### Patch Changes
+
+- 114c354: Respect `nitro.minify` and `nitro.sourceMap` in the production entry and routing modules.
+
 ## 0.12.1
 
 ### Patch Changes
