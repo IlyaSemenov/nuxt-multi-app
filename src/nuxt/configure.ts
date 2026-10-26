@@ -34,23 +34,25 @@ export function configureNuxtApp(nuxt: Nuxt, app: NormalizedAppOptions, settings
   nuxt.options.nitro.plugins = [...(nuxt.options.nitro.plugins ?? []), runtimePlugin]
   assertIsolatedOutput(nuxt.options.nitro, app.id)
 
-  nuxt.hook("nitro:build:before", (nitro) => {
-    nitro.options.replace["process.env.NUXT_MULTI_APP_ID"] = JSON.stringify(app.id)
-    // Nitro replacement values are JavaScript source; JSON-valued environment variables
-    // therefore need one serialization for their value and one for the string literal.
-    nitro.options.replace["process.env.NUXT_MULTI_APP_IDS"] = JSON.stringify(
-      JSON.stringify(settings.ids),
-    )
-    nitro.options.replace["process.env.NUXT_MULTI_APP_GATEWAY"] = JSON.stringify(
-      JSON.stringify(settings.gateway ?? null),
-    )
-    nitro.options.replace["process.env.NUXT_MULTI_APP_GATEWAY_TOKEN"] = JSON.stringify(
-      settings.token ?? "",
-    )
-    nitro.options.externals.inline ??= []
+  // Nitro creates its prerender instance from this configuration rather than from the options of
+  // the main instance, so both bundles receive the replacements and inlined runtime.
+  nuxt.hook("nitro:config", (config) => {
+    config.replace = {
+      ...config.replace,
+      "process.env.NUXT_MULTI_APP_ID": JSON.stringify(app.id),
+      // Nitro replacement values are JavaScript source; JSON-valued environment variables
+      // therefore need one serialization for their value and one for the string literal.
+      "process.env.NUXT_MULTI_APP_IDS": JSON.stringify(JSON.stringify(settings.ids)),
+      "process.env.NUXT_MULTI_APP_GATEWAY": JSON.stringify(
+        JSON.stringify(settings.gateway ?? null),
+      ),
+      "process.env.NUXT_MULTI_APP_GATEWAY_TOKEN": JSON.stringify(settings.token ?? ""),
+    }
+    config.externals ??= {}
+    config.externals.inline ??= []
     // Only this module depends on `crossws`, so inline the adapter instead of leaving a bare
     // external for Nitro to resolve from the application.
-    nitro.options.externals.inline.push(runtimeDir, /[/\\]crossws[/\\]/)
+    config.externals.inline.push(runtimeDir, /[/\\]crossws[/\\]/)
   })
 
   nuxt.hook("prepare:types", ({ references, nodeReferences, nodeTsConfig }) => {

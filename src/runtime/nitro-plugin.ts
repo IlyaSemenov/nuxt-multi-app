@@ -2,7 +2,7 @@ import wsAdapter from "crossws/adapters/node"
 import { defineNitroPlugin } from "nitropack/runtime"
 
 import { getProductionRuntime, type NitroEvent, type NitroRuntime } from "./contract"
-import { createDevDispatch, createFetchFactory } from "./dispatch"
+import { createDevDispatch, createFetchFactory, createPrerenderDispatch } from "./dispatch"
 import type { NuxtMultiAppDispatch, NuxtMultiAppRequestContext } from "./types"
 import { installWorkerProbe } from "./worker-probe"
 
@@ -15,18 +15,20 @@ const token = process.env.NUXT_MULTI_APP_GATEWAY_TOKEN ?? ""
 export default defineNitroPlugin((nitroValue) => {
   const nitro = nitroValue as unknown as NitroRuntime
   const production = getProductionRuntime()
-  if (!production) installWorkerProbe(nitroValue.h3App, token)
-  if (production) {
+  let dispatch: NuxtMultiAppDispatch
+  if (import.meta.prerender) {
+    dispatch = createPrerenderDispatch(appId, ids, nitro)
+  } else if (production) {
     // Nitro creates `h3App.websocket` only when `experimental.websocket` is enabled.
     const upgrade = nitro.h3App?.websocket
       ? wsAdapter(nitro.h3App.websocket as never).handleUpgrade
       : undefined
     production.register(appId, nitro, upgrade)
+    dispatch = production.dispatch
+  } else {
+    installWorkerProbe(nitroValue.h3App, token)
+    dispatch = createDevDispatch(appId, ids, nitro, gateway, token)
   }
-
-  const dispatch: NuxtMultiAppDispatch = production
-    ? production.dispatch
-    : createDevDispatch(appId, ids, nitro, gateway, token)
 
   nitro.hooks.hook("request", (event) => {
     const signal = dispatchSignal(event)

@@ -263,6 +263,7 @@ Cookies, authorization, tracing, and the original Host header travel only when y
 - A call to an application that is still loading in development waits until it loads.
 - A target that is shutting down answers 503 with `Retry-After: 1`.
 - The call is cancelled when its signal aborts or the server starts shutting down.
+- While `nuxt build` prerenders an application's routes, only that application runs: a call to itself works, a call to another application throws.
 
 Use `createFetch(id, options?)` when the caller is a client library configured with a `fetch` function: it builds the `Request` for you and dispatches it to that application.
 
@@ -403,6 +404,8 @@ The standard Nitro entry combines those isolated outputs behind one server proce
 The entry listens on `NITRO_PORT` or `PORT`, default `3000`, and on `NITRO_HOST` or `HOST` when one is set, like Nitro's `node-server` preset.
 
 On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active responses and dispatch calls up to `shutdownTimeout` to finish, and then closes every application.
+
+Routes an application lists for prerendering are rendered by that application's own Nitro bundle during `nuxt build`, and their files are served from its public assets.
 
 ### External package versions
 

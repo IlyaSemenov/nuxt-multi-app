@@ -30,11 +30,15 @@ export default defineNuxtConfig({
                   ),
                 },
               ],
-              // The handler above imports another version than the child; the test runner leaves this
-              // out to check that the conflict fails the production build.
-              ...(process.env.NUXT_MULTI_APP_TEST_EXTERNALS === "conflict"
-                ? {}
-                : { nitro: { externals: { inline: ["version-probe"] } } }),
+              nitro: {
+                // Only the mounted child provides the multi-app context the route reads.
+                prerender: { routes: ["/prerendered.json"] },
+                // The handler above imports another version than the child; the test runner leaves
+                // this out to check that the conflict fails the production build.
+                ...(process.env.NUXT_MULTI_APP_TEST_EXTERNALS === "conflict"
+                  ? {}
+                  : { externals: { inline: ["version-probe"] } }),
+              },
             },
             // The root and the child have separate installations of `version-probe`; the test runner
             // adds it to check that module setup fails.

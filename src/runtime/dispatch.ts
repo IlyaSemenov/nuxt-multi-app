@@ -35,6 +35,26 @@ export function createDevDispatch(
   }
 }
 
+/**
+ * Create a dispatcher for a Nitro prerender bundle, which runs during `nuxt build` without the
+ * other applications; dispatching to one of them throws.
+ */
+export function createPrerenderDispatch(
+  appId: string,
+  ids: string[],
+  nitro: Pick<NitroRuntime, "localFetch">,
+): NuxtMultiAppDispatch {
+  return async (targetId, request, options) => {
+    assertDispatchTarget(ids, targetId)
+    if (targetId !== appId) {
+      throw new Error(
+        `nuxt-multi-app: ${appId} cannot dispatch to ${targetId} while prerendering; other applications do not run during the build`,
+      )
+    }
+    return localFetch(nitro, request, options)
+  }
+}
+
 /** Build the request-context `createFetch`, which binds `fetch` to one target application. */
 export function createFetchFactory(
   dispatch: NuxtMultiAppDispatch,

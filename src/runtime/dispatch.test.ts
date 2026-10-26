@@ -2,7 +2,12 @@ import { describe, expect, it } from "bun:test"
 import { IncomingMessage, ServerResponse } from "node:http"
 import { Socket } from "node:net"
 
-import { createDevDispatch, createFetchFactory, internalPath } from "./dispatch"
+import {
+  createDevDispatch,
+  createFetchFactory,
+  createPrerenderDispatch,
+  internalPath,
+} from "./dispatch"
 import type { NuxtMultiAppDispatch } from "./types"
 
 describe("dispatch addressing", () => {
@@ -43,6 +48,16 @@ describe("dispatch addressing", () => {
       "web",
     )
     expect(calls).toEqual(["/marker?q=1"])
+  })
+
+  it("rejects other applications while prerendering", async () => {
+    const dispatch = createPrerenderDispatch("web", ["root", "web"], {
+      localFetch: async () => new Response("web"),
+    })
+    expect(await (await dispatch("web", new Request("http://internal/marker"))).text()).toBe("web")
+    await expect(dispatch("root", new Request("http://internal/marker"))).rejects.toThrow(
+      "web cannot dispatch to root while prerendering",
+    )
   })
 })
 

@@ -884,6 +884,17 @@ async function assertResolverStartupFailure(command: string[], cwd: string) {
   assert.match(await stderr, /resolver in routing rule 2 initialization failed/)
 }
 
+/** The build prerenders a mounted child's route that dispatches to itself and to another app. */
+async function assertPrerenderedDispatch(cwd: string) {
+  const output = await readFile(join(cwd, "root/.output/apps/web/public/prerendered.json"), "utf8")
+  assert.deepEqual(JSON.parse(output), {
+    app: "web",
+    self: { app: "web", owner: true },
+    other:
+      "nuxt-multi-app: web cannot dispatch to root while prerendering; other applications do not run during the build",
+  })
+}
+
 async function assertStaticProductionRouting(cwd: string) {
   const manifestPath = join(cwd, "output/server/multi-app.json")
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
@@ -1060,6 +1071,7 @@ try {
   assert.doesNotMatch(productionEntry, /late-nitro-output/)
   const nitro = JSON.parse(await readFile(join(workspace, "root/.output/nitro.json"), "utf8"))
   assert.equal(nitro.commands.preview, "node ./server/index.mjs")
+  await assertPrerenderedDispatch(workspace)
   await assertNuxtPreview(workspace)
   await checkServer(["node", "root/.output/server/index.mjs"], workspace, "production")
   await cp(join(workspace, "root/.output"), join(portable, "output"), { recursive: true })
