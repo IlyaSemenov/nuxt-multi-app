@@ -1,5 +1,13 @@
 # nuxt-multi-app
 
+## 0.12.1
+
+### Patch Changes
+
+- 5fece6a: Report a clear startup error when a `node --import` preload evaluates an application's server bundle before the production entry.
+- fb128d3: Use the Nuxt Kit of the application's Nuxt installation, so a package manager can no longer pair Nuxt 4.5 with a newer Kit.
+- c5f4394: Fix `nuxt build` failing for applications with prerendered routes. During prerendering, `dispatch()` serves calls to the prerendering application and throws for other applications.
+
 ## 0.12.0
 
 ### Minor Changes
