@@ -17,13 +17,26 @@ const markers = ["ROOT", "WEB"] as const
 
 test("isolates mounted applications and exercises their browser runtime", async ({ browser }) => {
   const context = await browser.newContext()
+  // Playwright can discard a replaced document's socket records before reporting their closure, so
+  // track HMR connections inside each document.
+  await context.addInitScript(() => {
+    const sockets: HmrSocket[] = []
+    ;(globalThis as typeof globalThis & { nuxtMultiAppHmr?: HmrSocket[] }).nuxtMultiAppHmr = sockets
+    globalThis.WebSocket = class extends WebSocket {
+      constructor(...args: ConstructorParameters<typeof WebSocket>) {
+        super(...args)
+        const entry = { socket: this, connected: false }
+        sockets.push(entry)
+        this.addEventListener("message", (event) => {
+          if (String(event.data).includes('"type":"connected"')) entry.connected = true
+        })
+      }
+    }
+  })
   const pages = await Promise.all(origins.map(() => context.newPage()))
   const requests = [[], []] as string[][]
   const hmr = [[], []] as string[][]
-  const socketEvents = [
-    { opened: 0, closed: 0 },
-    { opened: 0, closed: 0 },
-  ]
+  const socketCounts = [0, 0]
   const errors: string[] = []
 
   try {
@@ -34,8 +47,7 @@ test("isolates mounted applications and exercises their browser runtime", async 
       })
       page.on("request", (request) => requests[index]!.push(request.url()))
       page.on("websocket", (socket) => {
-        socketEvents[index]!.opened++
-        socket.on("close", () => socketEvents[index]!.closed++)
+        socketCounts[index]!++
         socket.on("framereceived", (frame) => hmr[index]!.push(String(frame.payload)))
       })
       const response = await page.goto(origins[index]!)
@@ -149,17 +161,13 @@ test("isolates mounted applications and exercises their browser runtime", async 
         const foreign = await context.request.get(new URL(assets[1 - index]!, origin).href)
         expect(foreign.status()).toBe(404)
       }
-      expect(socketEvents.every(({ opened }) => opened === 0)).toBe(true)
+      expect(socketCounts).toEqual([0, 0])
       await assertStableRuntime(pages, context.request, "0")
       expect(errors).toEqual([])
       return
     }
 
-    await expect
-      .poll(() =>
-        hmr.every((frames) => frames.some((frame) => frame.includes('"type":"connected"'))),
-      )
-      .toBe(true)
+    await expect.poll(() => hasLiveHmrSockets(pages)).toBe(true)
 
     for (const page of pages) {
       await page.getByRole("button", { name: "Count 0" }).click()
@@ -285,7 +293,6 @@ test("isolates mounted applications and exercises their browser runtime", async 
 
     // Exercise both restart origins and repeat the root reload with live HMR and HTTP streams.
     for (const [round, app] of ["root", "web", "root"].entries()) {
-      const socketGenerations = socketEvents.map((events) => ({ ...events }))
       const stream = openStream(`${origins[1]}/api/slow-probe`)
       await stream.started
       // The CLI skips the restart when a save leaves the resolved configuration unchanged; each
@@ -333,15 +340,7 @@ test("isolates mounted applications and exercises their browser runtime", async 
           )
         }).toPass({ timeout: 30_000 })
       }
-      await expect
-        .poll(() =>
-          socketEvents.every(
-            ({ opened, closed }, index) =>
-              opened > socketGenerations[index]!.opened &&
-              closed > socketGenerations[index]!.closed,
-          ),
-        )
-        .toBe(true)
+      await expect.poll(() => hasLiveHmrSockets(pages)).toBe(true)
     }
 
     await assertStableRuntime(pages, context.request, "1")
@@ -349,6 +348,31 @@ test("isolates mounted applications and exercises their browser runtime", async 
     await context.close()
   }
 })
+
+/** A WebSocket of the current document and whether the Vite HMR server acknowledged it. */
+interface HmrSocket {
+  socket: WebSocket
+  connected: boolean
+}
+
+/** Reports whether the current document of every page has an open, acknowledged HMR socket. */
+async function hasLiveHmrSockets(pages: Page[]) {
+  const live = await Promise.all(
+    pages.map((page) =>
+      page
+        .evaluate(() =>
+          (
+            globalThis as typeof globalThis & { nuxtMultiAppHmr?: HmrSocket[] }
+          ).nuxtMultiAppHmr?.some(
+            ({ socket, connected }) => connected && socket.readyState === WebSocket.OPEN,
+          ),
+        )
+        // A reload destroys the evaluation context; the next poll reads the new document.
+        .catch(() => false),
+    ),
+  )
+  return live.every(Boolean)
+}
 
 async function assertStableRuntime(pages: Page[], request: APIRequestContext, revision: string) {
   for (let round = 0; round < 4; round++) {
