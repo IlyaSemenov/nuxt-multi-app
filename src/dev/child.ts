@@ -3,7 +3,7 @@ import type { RequestListener, Server } from "node:http"
 import type { Duplex } from "node:stream"
 import { setTimeout } from "node:timers/promises"
 
-import { buildNuxt, writeTypes } from "@nuxt/kit"
+import { buildNuxt, writeTypes } from "nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
 import { logger } from "../logger"

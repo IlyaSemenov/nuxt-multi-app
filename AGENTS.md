@@ -31,6 +31,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Wait for worker readiness outside the child load queue, and keep readiness probes outside application request hooks, middleware, routes, and development handlers.
 - Reject build settings that defeat the documented module-instance isolation guarantee.
 - Keep Nuxt, Nitro, and Vite private API adaptations in `src/nuxt/compat.ts`.
+- Import Nuxt Kit and schema types through `nuxt/kit` and `nuxt/schema`, never `@nuxt/kit` or `@nuxt/schema`, and keep published declarations free of them; do not depend on `@nuxt/kit`.
 - Configure Nitro settings shared by production and prerender bundles through `nitro:config`.
 - Select the Nitro plugin's development, prerender, or production behavior from Nitro's `import.meta.dev` and `import.meta.prerender` flags, never from runtime state; a production bundle evaluated before the entry installs its registry must fail.
 - Check external package versions only in production builds, per application; dev and `nuxt prepare` must not register the check.

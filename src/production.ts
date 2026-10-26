@@ -1,9 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
-import { createResolver } from "@nuxt/kit"
 import type {} from "@nuxt/nitro-server"
 import type { NitroConfig } from "nitropack/types"
+import { createResolver } from "nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
 import { bundleForOutput, bundleProjectModule } from "./bundle"

@@ -41,7 +41,6 @@
     "types": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json"
   },
   "dependencies": {
-    "@nuxt/kit": "~4.5.2 || ~4.6.1",
     "crossws": "^0.3.5",
     "esbuild": "^0.28.2",
     "exsolve": "^1.0.8",

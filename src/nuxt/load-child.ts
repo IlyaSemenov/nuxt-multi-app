@@ -1,4 +1,4 @@
-import { buildNuxt, loadNuxt } from "@nuxt/kit"
+import { buildNuxt, loadNuxt } from "nuxt/kit"
 import type { Nuxt, NuxtConfig } from "nuxt/schema"
 
 import type { NormalizedAppOptions } from "../options"

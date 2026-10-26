@@ -1,4 +1,5 @@
-import { defineNuxtModule } from "@nuxt/kit"
+import { defineNuxtModule } from "nuxt/kit"
+import type { NuxtModule } from "nuxt/schema"
 
 import type { ModuleOptions } from "./options"
 import { MODULE_DEFAULTS } from "./options"
@@ -39,13 +40,18 @@ export function defineMultiAppFallback(factory: MultiAppFallbackFactory): MultiA
   return factory
 }
 
+// The annotation makes the published declaration refer to `nuxt/schema`, which resolves through the
+// application's Nuxt, instead of `@nuxt/schema`, which this package does not depend on.
 /** Nuxt module that composes independently configured applications behind one listener. */
-export default defineNuxtModule<ModuleOptions>({
-  meta: {
-    name: "nuxt-multi-app",
-    configKey: "multiApp",
-    compatibility: { nuxt: "~4.5.2 || ~4.6.1" },
-  },
-  defaults: MODULE_DEFAULTS,
-  setup: setupModule,
-})
+const multiAppModule: NuxtModule<ModuleOptions, ModuleOptions, false> =
+  defineNuxtModule<ModuleOptions>({
+    meta: {
+      name: "nuxt-multi-app",
+      configKey: "multiApp",
+      compatibility: { nuxt: "~4.5.2 || ~4.6.1" },
+    },
+    defaults: MODULE_DEFAULTS,
+    setup: setupModule,
+  })
+
+export default multiAppModule

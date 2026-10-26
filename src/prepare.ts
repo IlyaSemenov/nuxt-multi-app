@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
-import { writeTypes } from "@nuxt/kit"
+import { writeTypes } from "nuxt/kit"
 import type { Nuxt } from "nuxt/schema"
 
 import { relativePath, TYPECHECK_SOLUTION } from "./layout"
