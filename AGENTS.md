@@ -32,6 +32,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Reject build settings that defeat the documented module-instance isolation guarantee.
 - Keep Nuxt, Nitro, and Vite private API adaptations in `src/nuxt/compat.ts`.
 - Configure Nitro settings shared by production and prerender bundles through `nitro:config`.
+- Select the Nitro plugin's development, prerender, or production behavior from Nitro's `import.meta.dev` and `import.meta.prerender` flags, never from runtime state; a production bundle evaluated before the entry installs its registry must fail.
 - Check external package versions only in production builds, per application; dev and `nuxt prepare` must not register the check.
 - Check `sharedDependencies` during module setup in every mode, before any child loads; locate packages through `node_modules` lookup, not through package `exports`.
 - Embed each application's Vite bridge options as literals in its Nitro bundle, and inline every bridge module so none reads the shared env at runtime.
@@ -63,7 +64,7 @@ Do not catalog files or restate information evident from their names and locatio
 
 ## Tests
 
-- Exercise routing priority, unknown resolver IDs, explicit fallbacks, path-only dispatch, prerender dispatch, headers, streaming backpressure, cancellation, readiness, shutdown races, owner reload, Windows/TCP fallback, and packed-package use through their public boundaries.
+- Exercise routing priority, unknown resolver IDs, explicit fallbacks, path-only dispatch, prerender dispatch, early bundle evaluation, headers, streaming backpressure, cancellation, readiness, shutdown races, owner reload, Windows/TCP fallback, and packed-package use through their public boundaries.
 - Cover both applications in a real browser for hydration, isolated modules and styles, client HMR, overlapping asynchronous builder hooks, server reload, and full Nuxt restart.
 - Run Nuxt integration checks against the packed archive in an isolated consumer, not against the source directory.
 - Keep tests deterministic so a failure repeats on every run.

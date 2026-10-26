@@ -407,6 +407,11 @@ On `SIGINT` or `SIGTERM` the server stops accepting requests, gives active respo
 
 Routes an application lists for prerendering are rendered by that application's own Nitro bundle during `nuxt build`, and their files are served from its public assets.
 
+### Preloaded modules
+
+The entry loads every application's server bundle itself and attaches it to the composition while importing it.
+A module preloaded with `node --import`, such as an error-tracking SDK's server configuration, must not import an application's server chunks, directly or through code it shares with the application.
+
 ### External package versions
 
 Nitro imports external packages in the server bundle by their bare names, so when bundled code resolves one package to two installed versions, production loads one of them for all importers ([nitrojs/nitro#4731](https://github.com/nitrojs/nitro/issues/4731)).

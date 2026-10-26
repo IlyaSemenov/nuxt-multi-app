@@ -884,6 +884,28 @@ async function assertResolverStartupFailure(command: string[], cwd: string) {
   assert.match(await stderr, /resolver in routing rule 2 initialization failed/)
 }
 
+/** A preload that evaluates an application bundle before the production entry fails startup. */
+async function assertEarlyBundleEvaluation(cwd: string) {
+  const child = Bun.spawn(
+    ["node", "--import", "./output/apps/web/server/index.mjs", "output/server/index.mjs"],
+    {
+      cwd,
+      env: { ...process.env, HOST: "127.0.0.1", PORT: String(await unusedPort()) },
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  )
+  const stderr = new Response(child.stderr).text()
+  const timeout = setTimeout(() => child.kill("SIGKILL"), 10_000)
+  const exitCode = await child.exited
+  clearTimeout(timeout)
+  assert.notEqual(exitCode, 0, "Server started with an application bundle evaluated early")
+  assert.match(
+    await stderr,
+    /the Nitro bundle of web was evaluated before the production entry installed its runtime/,
+  )
+}
+
 /** The build prerenders a mounted child's route that dispatches to itself and to another app. */
 async function assertPrerenderedDispatch(cwd: string) {
   const output = await readFile(join(cwd, "root/.output/apps/web/public/prerendered.json"), "utf8")
@@ -1077,6 +1099,7 @@ try {
   await cp(join(workspace, "root/.output"), join(portable, "output"), { recursive: true })
   await checkServer(["node", "output/server/index.mjs"], portable, "portable")
   await assertResolverStartupFailure(["node", "output/server/index.mjs"], portable)
+  await assertEarlyBundleEvaluation(portable)
   await assertStaticProductionRouting(portable)
   await assertExternalVersionConflict(workspace)
 } finally {
