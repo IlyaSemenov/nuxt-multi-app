@@ -1,6 +1,6 @@
 {
   "name": "nuxt-multi-app",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "Run several independent Nuxt applications behind one HTTP server.",
   "homepage": "https://github.com/IlyaSemenov/nuxt-multi-app#readme",
   "bugs": "https://github.com/IlyaSemenov/nuxt-multi-app/issues",

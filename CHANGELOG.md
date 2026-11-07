@@ -1,5 +1,11 @@
 # nuxt-multi-app
 
+## 0.12.3
+
+### Patch Changes
+
+- 9a57024: Let a child's dev server serve files from `node_modules` of the root's workspace, so that fonts and other files referenced from CSS load when a nested checkout's packages are installed there.
+
 ## 0.12.2
 
 ### Patch Changes
