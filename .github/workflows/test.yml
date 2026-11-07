@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          version: 2026.7.15
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Check formatting and lint rules
+        run: bun run lint:check
+
+      - name: Build package
+        run: bun run build
+
+      - name: Typecheck package
+        run: bun run types
+
+      - name: Test package
+        run: bun run test
+
+      - name: Test packed package with Nuxt
+        run: |
+          bun run playwright install --with-deps chromium-headless-shell
+          bun run test:nuxt

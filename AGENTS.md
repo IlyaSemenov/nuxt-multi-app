@@ -56,12 +56,11 @@ Do not catalog files or restate information evident from their names and locatio
 
 ## Changesets
 
-- Before the first publication, update `.changeset/initial-release.md` instead of creating additional changesets.
-- After the first publication, add one `.changeset/*.md` file for each independently releasable user-visible change.
+- Add one `.changeset/*.md` file for each independently releasable user-visible change.
 - Do not add changesets for internal refactors, maintenance, tests, or documentation changes that do not require a package release.
 - Choose the SemVer bump from the public contract: `patch` for backward-compatible fixes and `minor` for backward-compatible functionality.
 - Use `minor` for breaking changes while the package version is `0.x`; from `1.0.0`, use `major` for breaking changes.
-- Do not edit the package version or `CHANGELOG.md` by hand, and do not run `changeset version` or `changeset publish`; the release workflow consumes pending changesets.
+- Do not edit the package version or `CHANGELOG.md` by hand, and do not run `changeset version` or `changeset publish`; the maintainer releases pending changesets with `bun run release`.
 
 ## Tests
 
@@ -75,6 +74,7 @@ Do not catalog files or restate information evident from their names and locatio
 
 ## Checks
 
+- Keep the `release:check` script running the same checks as the test workflow.
 - Run the `types` script when public types or TypeScript configuration change.
 - Run the `test` script when behavior changes.
 - Run the `build` script when package exports, declarations, or supported runtimes change.

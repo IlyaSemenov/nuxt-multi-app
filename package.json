@@ -27,8 +27,7 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "nuxt-module-build build && publint",
@@ -36,6 +35,8 @@
     "lint:check": "oxlint && oxfmt --check",
     "prepare": "lefthook install",
     "prepublishOnly": "bun run build",
+    "release": "changesets-local",
+    "release:check": "bun run lint:check && bun run build && bun run types && bun run test && bun run test:nuxt",
     "test": "bun test src",
     "test:nuxt": "bun run build && bun tests/nuxt/run.ts 4.6.1",
     "types": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json"
@@ -49,7 +50,7 @@
     "semver": "^7.7.2"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.1",
+    "@changesets/cli": "^3.0.3",
     "@nuxt/cli": "^4.0.1",
     "@nuxt/module-builder": "^1.0.3",
     "@nuxt/nitro-server": "~4.6.1",
@@ -58,6 +59,7 @@
     "@types/bun": "^1.4.0",
     "@types/node": "^22.20.0",
     "@types/semver": "^7.7.1",
+    "changesets-local": "^1.6.0",
     "nuxt": "~4.6.1",
     "oxfmt": "^0.67.0",
     "oxlint": "^1.82.0",
