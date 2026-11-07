@@ -67,7 +67,11 @@ export function createChild(
   async function start(server: Server) {
     nuxt = await loadChildNuxt(
       options,
-      { type: "dev", devServer: root.options.devServer },
+      {
+        type: "dev",
+        devServer: root.options.devServer,
+        rootWorkspaceDir: root.options.workspaceDir,
+      },
       { ids, gateway: gateway.address, token: gateway.token },
     )
     if (closing) return

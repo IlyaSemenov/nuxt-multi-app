@@ -1,3 +1,5 @@
+import { join } from "node:path"
+
 import { buildNuxt, loadNuxt } from "nuxt/kit"
 import type { Nuxt, NuxtConfig } from "nuxt/schema"
 
@@ -7,7 +9,7 @@ import { configureNuxtApp, type RuntimeSettings } from "./configure"
 
 /** How a mounted child is loaded: served in development, prepared for types, or built for production. */
 export type ChildMode =
-  | { type: "dev"; devServer: NuxtConfig["devServer"] }
+  | { type: "dev"; devServer: NuxtConfig["devServer"]; rootWorkspaceDir: string }
   | { type: "prepare" }
   | { type: "build"; outputDir: string }
 
@@ -64,6 +66,27 @@ function childOverrides(app: NormalizedAppOptions, mode: ChildMode): NuxtConfig 
         }
       : undefined),
     // Vite's default cache lives under the child root and would be shared with standalone runs.
-    vite: { ...overrides.vite, cacheDir: `${app.buildDir}/cache/vite` },
+    vite: {
+      ...overrides.vite,
+      cacheDir: `${app.buildDir}/cache/vite`,
+      // A nested checkout is its own Nuxt workspace, while its packages may be installed in the root's.
+      // Vite serves imported modules from anywhere, but not the files that CSS refers to, such as fonts.
+      // Only the installed packages are allowed: the child does not inherit the root's `fs.deny`,
+      // so allowing the whole workspace would expose files that the root restricts.
+      ...(mode.type === "dev"
+        ? {
+            server: {
+              ...overrides.vite?.server,
+              fs: {
+                ...overrides.vite?.server?.fs,
+                allow: [
+                  ...(overrides.vite?.server?.fs?.allow ?? []),
+                  join(mode.rootWorkspaceDir, "node_modules"),
+                ],
+              },
+            },
+          }
+        : undefined),
+    },
   } as NuxtConfig
 }

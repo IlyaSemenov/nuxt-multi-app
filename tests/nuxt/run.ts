@@ -3,7 +3,7 @@ import { once } from "node:events"
 import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { connect, createServer } from "node:net"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import ts from "typescript"
 
@@ -16,6 +16,7 @@ const portable = await mkdtemp(join(tmpdir(), "nuxt-multi-app-output-"))
 
 const nuxtVersion = process.argv[2] ?? "4.6.1"
 const hosts = { root: "landing.localhost", web: "foo.tenant.localhost" }
+const NESTED_CHECKOUT_ASSET = "node_modules/font-probe/font.woff2"
 
 /** Whether owned processes get their own process group, which Windows lacks. */
 const OWN_GROUP = process.platform !== "win32"
@@ -209,6 +210,20 @@ async function runBrowser(workspace: string, port: number, mode: "development" |
     NUXT_MULTI_APP_TEST_WORKSPACE: workspace,
     NUXT_MULTI_APP_TEST_OUTPUT: join(workspace, "contexts.jsonl"),
   })
+}
+
+/** A child in a nested checkout serves assets from the root's installation without allowing the entire root workspace. */
+async function assertRootWorkspaceAssetServed(origin: string) {
+  const rootWorkspace = await realpath(workspace)
+  const asset = await request(
+    origin,
+    `/_nuxt/@fs${join(rootWorkspace, NESTED_CHECKOUT_ASSET)}`,
+    hosts.web,
+  )
+  assert.equal(asset.status, 200, await asset.clone().text())
+  assert.equal(await asset.text(), NESTED_CHECKOUT_ASSET)
+  const manifest = await request(origin, `/_nuxt/@fs${rootWorkspace}/package.json`, hosts.web)
+  assert.equal(manifest.status, 403, await manifest.clone().text())
 }
 
 async function assertBackpressure(origin: string) {
@@ -698,6 +713,7 @@ async function checkServer(
     await assertWebSocket(port)
     await assertBackpressure(origin)
     await assertPackageVersions(origin)
+    if (mode === "development") await assertRootWorkspaceAssetServed(origin)
     if (mode !== "portable") await runBrowser(workspace, port, mode)
 
     if (mode === "production") {
@@ -1037,6 +1053,7 @@ try {
   await run(["bun", "install", "--ignore-scripts"], workspace)
   await installChildOnlyDependency()
   await installVersionProbes()
+  await installNestedCheckoutAsset()
   await run(["bun", "run", "nuxt", "prepare", "web"], workspace)
   // Preparing types does not build bundles, so conflicting package versions do not stop it.
   await run(["bun", "run", "nuxt", "prepare", "root"], workspace, {
@@ -1165,6 +1182,18 @@ async function installVersionProbes() {
     )
     await writeFile(join(packageDir, "index.d.ts"), "export declare const version: string\n")
   }
+}
+
+/**
+ * Turn the child into a nested checkout of another repository, which Nuxt treats as a separate
+ * workspace, and install a package with a static file only in the root's workspace.
+ */
+async function installNestedCheckoutAsset() {
+  await mkdir(join(workspace, "web/.git"), { recursive: true })
+  await writeFile(join(workspace, "web/.git/config"), "")
+  const asset = join(workspace, NESTED_CHECKOUT_ASSET)
+  await mkdir(dirname(asset), { recursive: true })
+  await writeFile(asset, NESTED_CHECKOUT_ASSET)
 }
 
 /**

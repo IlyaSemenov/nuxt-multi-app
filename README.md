@@ -377,6 +377,10 @@ Editing a child's `nuxt.config` restarts every mounted application.
 Vite checks hostnames after routing, not before.
 If a custom development hostname comes back as `403 Blocked request`, add it to `vite.server.allowedHosts` of the application that handles it.
 
+Vite also limits which files it serves.
+Each child's `vite.server.fs.allow` includes `node_modules` of the root's workspace, so that a [nested checkout](#shared-dependencies) can load fonts and other files that CSS refers to from packages installed there.
+If any other file comes back as `403 Restricted`, add its directory to `vite.server.fs.allow` of the application that handles it.
+
 ## Building for production
 
 Run `nuxt build` on the root application; it builds every child and writes one process entry to run:
