@@ -74,7 +74,6 @@ Do not catalog files or restate information evident from their names and locatio
 
 ## Checks
 
-- Keep the `release:check` script running the same checks as the test workflow.
 - Run the `types` script when public types or TypeScript configuration change.
 - Run the `test` script when behavior changes.
 - Run the `build` script when package exports, declarations, or supported runtimes change.

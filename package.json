@@ -36,7 +36,6 @@
     "prepare": "lefthook install",
     "prepublishOnly": "bun run build",
     "release": "changesets-local",
-    "release:check": "bun run lint:check && bun run build && bun run types && bun run test && bun run test:nuxt",
     "test": "bun test src",
     "test:nuxt": "bun run build && bun tests/nuxt/run.ts 4.6.1",
     "types": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json"
