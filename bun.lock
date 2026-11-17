@@ -22,7 +22,7 @@
         "@types/bun": "^1.4.0",
         "@types/node": "^22.20.0",
         "@types/semver": "^7.7.1",
-        "changesets-local": "^1.6.0",
+        "changesets-release": "^2.1.1",
         "nuxt": "~4.6.1",
         "oxfmt": "^0.67.0",
         "oxlint": "^1.82.0",
@@ -592,7 +592,7 @@
 
     "caniuse-lite": ["caniuse-lite@1.0.30001815", "", {}, "sha512-uDybUEyfgbyJJ93J1vikTylBX31AkdVYeVPeffMQpf8XN7hSfr0oZOn4VFOIMNvtU5+rHvC5Udg2TgtJKHm23Q=="],
 
-    "changesets-local": ["changesets-local@1.6.0", "", { "bin": { "changesets-local": "dist/cli.mjs" } }, "sha512-c7U00YJKE/BBLpueixqoMtR8c2sHcOtaInHAaQhLawK3hbYT6Hk5lQJ74uLNyd8/2I8c6dVL8XWz/BB2DYOg/w=="],
+    "changesets-release": ["changesets-release@2.1.1", "", { "bin": { "changesets-release": "dist/cli.mjs" } }, "sha512-vVJ3MaIeSgo0TyuJz9ZOEbxmeJLaG/OXnbPGbJggum3UtbFangJgzBvZs/UMXSZs7/0pfDpVmS9Bf2Gc9533nw=="],
 
     "chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
 
